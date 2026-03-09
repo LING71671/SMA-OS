@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package sma;
+
+option go_package = "sma-os/sma-proto/sandbox";
+
+// The gRPC Service exposed by the Rust Sandbox Daemon
+service SandboxManager {
+    // Orchestrator (Go) requests a warm MicroVM from the pool to execute a task
+    rpc AssignMicroVM (AssignRequest) returns (AssignResponse);
+    
+    // Orchestrator (Go) requests termination or garbage collection of a specific VM
+    rpc TeardownMicroVM (TeardownRequest) returns (TeardownResponse);
+}
+
+// Data structures for Assigning a Task to a MicroVM
+message AssignRequest {
+    string tenant_id = 1;
+    string namespace = 2;
+    string action_name = 3;
+    string payload_json = 4;
+}
+
+message AssignResponse {
+    bool success = 1;
+    string assigned_vm_id = 2;
+    string ip_address = 3;
+    string error_message = 4;
+}
+
+// Data structures for Tearing down a MicroVM
+message TeardownRequest {
+    string vm_id = 1;
+    string reason = 2; // e.g. "COMPLETED", "SECURITY_BREACH_EBPF"
+}
+
+message TeardownResponse {
+    bool success = 1;
+    string status = 2;
+}
