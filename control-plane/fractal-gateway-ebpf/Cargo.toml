@@ -1,0 +1,19 @@
+[package]
+name = "fractal-gateway-ebpf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aya-ebpf = "0.1"
+aya-log-ebpf = "0.1"
+network-types = "0.0.5"
+
+[build-dependencies]
+# Necessary for eBPF code generation
+
+[features]
+default = []
+
+[[bin]]
+name = "fractal-gateway-ebpf"
+path = "src/main.rs"

@@ -2,6 +2,7 @@
 members = [
     "state-engine",
     "fractal-gateway",
+    "fractal-gateway-ebpf",
     "teardown-ctrl"
 ]
 resolver = "2"

@@ -1,0 +1,14 @@
+[package]
+name = "fractal-gateway"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aya = { version = "0.3", features = ["async_tokio"] }
+aya-log = "0.2"
+tokio = { version = "1.34", features = ["mac", "rt", "rt-multi-thread", "net", "signal"] }
+env_logger = "0.10"
+log = "0.4"
+anyhow = "1.0"
+# fractal-gateway-ebpf will be loaded at runtime, so we don't depend on it directly as a library here in cargo, 
+# but usually we use xtask to compile it. For now, we mock the loader.
