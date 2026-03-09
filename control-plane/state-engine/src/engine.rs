@@ -31,6 +31,12 @@ impl StateEngine {
         let redis_client = redis::Client::open(redis_url)?;
         let pg_pool = PgPool::connect(pg_url).await?;
 
+        // Run migrations on startup
+        sqlx::migrate!("./migrations")
+            .run(&pg_pool)
+            .await
+            .expect("Failed to execute database migrations");
+
         Ok(Self {
             redis_client,
             pg_pool,
@@ -43,26 +49,27 @@ impl StateEngine {
         let mut conn = self.redis_client.get_async_connection().await?;
         let event_json = serde_json::to_string(&event)?;
         let redis_key = format!("events:{}:{}", event.tenant_id, event.namespace);
-        let _: () = conn.zadd(&redis_key, event.version, &event_json).await?;
+        let _: () = conn.zadd(&redis_key, event.version as f64, &event_json).await?;
 
-        // 2. 异步持久化到 PostgreSQL (这里简化为同步，实际可由后台 worker 批量 flush)
-        sqlx::query!(
+        // 2. 异步持久化到 PostgreSQL (这里采用直接写入代替后台 flush)
+        sqlx::query(
             r#"
             INSERT INTO hot_events (event_id, tenant_id, namespace, version, payload, timestamp)
             VALUES ($1, $2, $3, $4, $5, $6)
-            "#,
-            event.event_id,
-            event.tenant_id,
-            event.namespace,
-            event.version as i64,
-            event.payload,
-            event.timestamp
+            ON CONFLICT (tenant_id, namespace, version) DO NOTHING
+            "#
         )
+        .bind(&event.event_id)
+        .bind(&event.tenant_id)
+        .bind(&event.namespace)
+        .bind(&(event.version as i64))
+        .bind(&event.payload)
+        .bind(&event.timestamp)
         .execute(&self.pg_pool)
         .await?;
 
-        // 检查是否到达 1000 个 Event，触发全量快照生成（此处略）
-        if event.version % 1000 == 0 {
+        // 检查是否到达 1000 个 Event，触发全量快照生成
+        if event.version > 0 && event.version % 1000 == 0 {
             self.trigger_snapshot(event.tenant_id, event.namespace, event.version).await?;
         }
 
@@ -72,7 +79,27 @@ impl StateEngine {
     /// 触发快照生成逻辑（压缩归档）
     async fn trigger_snapshot(&self, tenant_id: String, namespace: String, current_version: u64) -> Result<(), EngineError> {
         tracing::info!("Generating snapshot for {}/{} at version {}", tenant_id, namespace, current_version);
-        // ... snapshot logi ...
+        // FIXME: Placeholder for actual snapshot building logic
+        let snapshot_id = uuid::Uuid::new_v4();
+        let state_blob = serde_json::json!({"status": "compressed_state: placeholder"});
+        
+        sqlx::query(
+            r#"
+            INSERT INTO snapshots (snapshot_id, tenant_id, namespace, start_version, end_version, state_blob, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (tenant_id, namespace, end_version) DO NOTHING
+            "#
+        )
+        .bind(&snapshot_id)
+        .bind(&tenant_id)
+        .bind(&namespace)
+        .bind(&(current_version.saturating_sub(1000) as i64))
+        .bind(&(current_version as i64))
+        .bind(&state_blob)
+        .bind(&chrono::Utc::now().timestamp())
+        .execute(&self.pg_pool)
+        .await?;
+
         Ok(())
     }
 }
