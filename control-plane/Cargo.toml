@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "state-engine",
+    "fractal-gateway",
+    "teardown-ctrl"
+]
+resolver = "2"

@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "sandbox-daemon",
+    "stateful-repl"
+]
+resolver = "2"
