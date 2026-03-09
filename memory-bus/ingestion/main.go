@@ -1,115 +1,89 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"log"
-	"math/rand"
-	"os"
-	"os/signal"
 	"regexp"
-	"syscall"
+	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
-// StructuredMemoryObject represents a verified output stored in the memory bus
-type StructuredMemoryObject struct {
-	ObjectID   string          `json:"object_id"`
-	Version    uint64          `json:"version"`
-	TenantID   string          `json:"tenant_id"`
-	TraceID    string          `json:"trace_id"`
-	Confidence float64         `json:"confidence"`
-	Payload    json.RawMessage `json:"payload"`
-	CreatedAt  time.Time       `json:"created_at"`
+// Intent schema that downstream Evaluator expects
+type ParsedIntent struct {
+	Action     string  `json:"action"`
+	Target     string  `json:"target"`
+	Parameters string  `json:"parameters"`
+	Confidence float64 `json:"confidence"`
+	Source     string  `json:"source"`
 }
 
-type IngestionPipeline struct {
-	FallbackRegex *regexp.Regexp
-}
+// Simulate an LLM API call (e.g. to a local Ollama Llama-3 instance)
+func invokeLLM(prompt string) (string, error) {
+	log.Printf("[LLM Invocation] Querying LLM API with prompt length %d...", len(prompt))
+	time.Sleep(300 * time.Millisecond) // Simulated inference latency
 
-func NewIngestionPipeline() *IngestionPipeline {
-	return &IngestionPipeline{
-		FallbackRegex: regexp.MustCompile(`(?i)(extract|find|create):\s*(.*)`),
+	// We'll intentionally simulate a failure or a hallucinated / malformed JSON string for demonstration
+	if strings.Contains(prompt, "complex command") {
+		return "", errors.New("timeout or rate limited from LLM Endpoint")
 	}
+
+	return `{"action": "create_vm", "target": "pool-A", "parameters": "cpu=2,ram=4G"}`, nil
 }
 
-// Process ingestion stream with dual-fallback logic
-func (p *IngestionPipeline) Process(tenantID, rawText string, version uint64) *StructuredMemoryObject {
-	traceID := uuid.New().String()
-	objID := uuid.New().String()
+// Fallback logic using deterministic Regex
+func fallbackRegexExtractor(prompt string) (*ParsedIntent, error) {
+	log.Println("[Fallback Engine] LLM failed! Activating high-confidence Regex extraction...")
 
-	log.Printf("[Ingestion] Processing text for trace: %s", traceID)
+	// Example Regex matching "create vm <pool> <params>"
+	re := regexp.MustCompile(`(?i)create\s+(?:a\s+)?(?:vm|instance)\s+in\s+pool\s+(\w+)\s+with\s+(.+)`)
+	matches := re.FindStringSubmatch(prompt)
 
-	// 1. Primary path: Try Local SLM (e.g., Llama-3-8B)
-	confidence := p.mockSLMInfer(rawText)
+	if len(matches) == 3 {
+		return &ParsedIntent{
+			Action:     "create_vm",
+			Target:     matches[1],
+			Parameters: strings.ReplaceAll(matches[2], " ", ""),
+			Confidence: 0.99,
+			Source:     "REGEX_FALLBACK",
+		}, nil
+	}
 
-	var payload json.RawMessage
-	if confidence >= 0.98 {
-		log.Printf("[Ingestion] SLM Confidence %.2f > 98%%. Accepting direct structure.", confidence)
-		payload = json.RawMessage(`{"status": "slm_extracted", "content": "verified"}`)
-	} else {
-		// 2. Dual fallback: Rule engine / Regex
-		log.Printf("[Ingestion] SLM Confidence %.2f < 98%%. Falling back to deterministic rules.", confidence)
-		matches := p.FallbackRegex.FindStringSubmatch(rawText)
-		if len(matches) > 2 {
-			payload = json.RawMessage(`{"status": "regex_extracted", "keyword": "` + matches[2] + `"}`)
-		} else {
-			payload = json.RawMessage(`{"status": "failed", "content": "unrecognized"}`)
+	return nil, errors.New("no matching pre-defined regex rules found")
+}
+
+func ProcessInput(userInput string) (*ParsedIntent, error) {
+	log.Printf("\n--- Processing User Input: %s ---", userInput)
+
+	// 1. Attempt LLM JSON Extraction
+	llmResponse, err := invokeLLM(userInput)
+	if err == nil {
+		var intent ParsedIntent
+		if err := json.Unmarshal([]byte(llmResponse), &intent); err == nil {
+			intent.Source = "LLM"
+			intent.Confidence = 0.85
+			log.Println("[Ingestion] LLM successfully extracted intent.")
+			return &intent, nil
 		}
 	}
 
-	// Forge the immutable audit chain record
-	return &StructuredMemoryObject{
-		ObjectID:   objID,
-		Version:    version,
-		TenantID:   tenantID,
-		TraceID:    traceID,
-		Confidence: confidence,
-		Payload:    payload,
-		CreatedAt:  time.Now(),
+	// 2. Fallback to Regex / AST Parsing if LLM fails, hallucinates, or times out
+	intent, fallbackErr := fallbackRegexExtractor(userInput)
+	if fallbackErr == nil {
+		return intent, nil
 	}
-}
 
-func (p *IngestionPipeline) mockSLMInfer(text string) float64 {
-	// Mock returns a random confidence between 90% and 100%
-	return 0.90 + rand.Float64()*0.10
+	return nil, errors.New("pipeline exhausted: both LLM and Fallback failed to understand intent")
 }
 
 func main() {
-	log.Println("Starting SMA-OS SLM Ingestion Pipeline v2.0...")
+	log.Println("Initializing SMA-OS Memory Bus: Ingestion / Fallback Pipeline v2.0")
 
-	pipeline := NewIngestionPipeline()
+	// Case 1: Simple command handled by LLM appropriately
+	intent1, _ := ProcessInput("Please create a VM in pool-A with cpu=2,ram=4G")
+	log.Printf("Final Intent 1: %+v\n", intent1)
 
-	obj1 := pipeline.Process("tenant-alpha", "extract: payment_info", 1)
-	log.Printf("Ingested Object: %+v\n", obj1)
-
-	obj2 := pipeline.Process("tenant-beta", "Some random unstructured chat that SLM might fail to parse perfectly.", 1)
-	log.Printf("Ingested Object: %+v\n", obj2)
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() {
-		<-quit
-		log.Println("Ingestion pipeline shutting down...")
-		cancel()
-	}()
-
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			log.Println("[Ingestion] Waiting for raw text streams...")
-		case <-ctx.Done():
-			log.Println("Ingestion gracefully stopped.")
-			return
-		}
-	}
+	// Case 2: Complex command that causes LLM to hallucinate or timeout, gracefully degraded
+	intent2, _ := ProcessInput("complex command: create a vm in pool B with cpu=8,ram=16G")
+	log.Printf("Final Intent 2: %+v\n", intent2)
 }
