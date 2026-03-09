@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+:root {
+  --background: #0a0a0f;
+  --foreground: #eef2ff;
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.4);
+  --success: #10b981;
+  --danger: #ef4444;
+  --panel-bg: rgba(20, 20, 30, 0.7);
+  --border-color: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+  overflow: hidden;
+}
+
+/* Glassmorphism Panels */
+.glass-panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Neon Text Glow */
+.text-neon {
+  text-shadow: 0 0 10px var(--accent-glow), 0 0 20px var(--accent-glow);
+}
+
+.react-flow__bg {
+  background-color: transparent !important;
+}
+
+/* Custom Node Styles for ReactFlow */
+.custom-node {
+  padding: 10px 15px;
+  border-radius: 8px;
+  background: rgba(30, 30, 40, 0.9);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  text-align: center;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+.custom-node:hover {
+  transform: scale(1.05);
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.custom-node.active {
+  border-color: var(--success);
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.5);
+}
+
+.custom-node.rejected {
+  border-color: var(--danger);
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
+}
+
+/* Animations */
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 10px var(--accent-glow); }
+  50% { box-shadow: 0 0 30px var(--accent-glow); }
+  100% { box-shadow: 0 0 10px var(--accent-glow); }
+}
+
+.pulsing {
+  animation: pulseGlow 2s infinite ease-in-out;
+}
