@@ -1,5 +1,19 @@
 # SMA-OS Agent Development Guide
 
+**Generated**: 2026-03-10  
+**Commit**: See `git log -1`  
+**Branch**: main  
+
+## Hierarchy
+
+This root AGENTS.md covers project-wide conventions. Module-specific guides:
+
+- [`control-plane/state-engine/AGENTS.md`](control-plane/state-engine/AGENTS.md) - Event sourcing state kernel
+- [`control-plane/fractal-gateway/AGENTS.md`](control-plane/fractal-gateway/AGENTS.md) - eBPF security gateway
+- [`observability-ui/web-dashboard/AGENTS.md`](observability-ui/web-dashboard/AGENTS.md) - Next.js observability UI
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -306,3 +320,21 @@ npm run dev --prefix observability-ui/web-dashboard
 - **API documentation**: Check inline doc comments
 - **Debugging**: Enable tracing with `RUST_LOG=debug`
 - **Performance**: Check Jaeger traces for latency analysis
+
+---
+
+## Module Index
+
+| Module | Purpose | Language | Complexity |
+|--------|---------|----------|------------|
+| `control-plane/state-engine` | Event sourcing with Redis/PostgreSQL | Rust | High |
+| `control-plane/fractal-gateway` | Resource isolation and auth | Rust | Medium |
+| `control-plane/teardown-ctrl` | Cascading cleanup controller | Rust | Medium |
+| `orchestration/manager` | Topological task execution | Go | Medium |
+| `orchestration/scheduler` | Worker dispatch | Go | Low |
+| `orchestration/evaluator` | Output validation | Go | Low |
+| `memory-bus/ingestion` | SLM-powered intent extraction | Go | Medium |
+| `memory-bus/vector-kv` | Vector + KV storage | Go | Low |
+| `execution-layer/sandbox-daemon` | VM lifecycle management | Rust | Medium |
+| `execution-layer/stateful-repl` | Persistent terminals | Rust | Low |
+| `observability-ui/web-dashboard` | Real-time DAG visualization | TypeScript | Medium |
