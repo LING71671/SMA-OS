@@ -42,37 +42,40 @@ impl StateEngine {
         })
     }
 
-    pub async fn append_event(&self, event: StateEvent) -> Result<(), EngineError> {
-        let mut conn = self.redis_client.get_async_connection().await?;
-        let event_json = serde_json::to_string(&event)?;
-        let redis_key = format!("events:{}:{}", event.tenant_id, event.namespace);
-        let _: () = conn
-            .zadd(&redis_key, event.version as f64, &event_json)
-            .await?;
+pub async fn append_event(&self, event: StateEvent) -> Result<(), EngineError> {
+    let mut conn = self.redis_client.get_async_connection().await?;
+    let event_json = serde_json::to_string(&event)?;
+    let redis_key = format!("events:{}:{}", event.tenant_id, event.namespace);
+    let _: () = conn
+        .zadd(&redis_key, event.version as f64, &event_json)
+        .await?;
 
-        sqlx::query(
-            r#"
+    let tenant_id = event.tenant_id.clone();
+    let namespace = event.namespace.clone();
+
+    sqlx::query(
+        r#"
         INSERT INTO hot_events (event_id, tenant_id, namespace, version, payload, timestamp)
         VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (tenant_id, namespace, version) DO NOTHING
         "#
-        )
-        .bind(&event.event_id)
-        .bind(&event.tenant_id)
-        .bind(&event.namespace)
-        .bind(&(event.version as i64))
-        .bind(&event.payload)
-        .bind(&event.timestamp)
-        .execute(&self.pg_pool)
+    )
+    .bind(event.event_id)
+    .bind(event.tenant_id)
+    .bind(event.namespace)
+    .bind(event.version as i64)
+    .bind(event.payload)
+    .bind(event.timestamp)
+    .execute(&self.pg_pool)
+    .await?;
+
+    if event.version > 0 && event.version.is_multiple_of(1000) {
+        self.trigger_snapshot(tenant_id, namespace, event.version)
         .await?;
-
-        if event.version > 0 && event.version % 1000 == 0 {
-            self.trigger_snapshot(event.tenant_id, event.namespace, event.version)
-                .await?;
-        }
-
-        Ok(())
     }
+
+    Ok(())
+}
 
     async fn trigger_snapshot(
         &self,
@@ -89,22 +92,22 @@ impl StateEngine {
         let snapshot_id = uuid::Uuid::new_v4();
         let state_blob = serde_json::json!({"status": "compressed_state: placeholder"});
 
-        sqlx::query(
-            r#"
+    sqlx::query(
+        r#"
         INSERT INTO snapshots (snapshot_id, tenant_id, namespace, start_version, end_version, state_blob, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (tenant_id, namespace, end_version) DO NOTHING
         "#
-        )
-        .bind(&snapshot_id)
-        .bind(&tenant_id)
-        .bind(&namespace)
-        .bind(&(current_version.saturating_sub(1000) as i64))
-        .bind(&(current_version as i64))
-        .bind(&state_blob)
-        .bind(&chrono::Utc::now().timestamp())
-        .execute(&self.pg_pool)
-        .await?;
+    )
+    .bind(snapshot_id)
+    .bind(tenant_id)
+    .bind(namespace)
+    .bind(current_version.saturating_sub(1000) as i64)
+    .bind(current_version as i64)
+    .bind(state_blob)
+    .bind(chrono::Utc::now().timestamp())
+    .execute(&self.pg_pool)
+    .await?;
 
         Ok(())
     }
@@ -203,18 +206,18 @@ impl StateEngine {
                     .fetch_all(&self.pg_pool)
                     .await?;
 
-                rows.into_iter()
-                    .filter_map(|row| {
-                        Some(StateEvent {
-                            event_id: row.get("event_id"),
-                            tenant_id: row.get("tenant_id"),
-                            namespace: row.get("namespace"),
-                            version: row.get::<i64, _>("version") as u64,
-                            payload: row.get("payload"),
-                            timestamp: row.get("timestamp"),
-                        })
-                    })
-                    .collect()
+    rows.into_iter()
+        .map(|row| {
+            StateEvent {
+                event_id: row.get("event_id"),
+                tenant_id: row.get("tenant_id"),
+                namespace: row.get("namespace"),
+                version: row.get::<i64, _>("version") as u64,
+                payload: row.get("payload"),
+                timestamp: row.get("timestamp"),
+            }
+        })
+        .collect()
             }
         };
 

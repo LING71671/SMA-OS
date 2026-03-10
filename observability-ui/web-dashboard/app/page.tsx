@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useCallback } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -10,8 +9,8 @@ import ReactFlow, {
   MarkerType,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { Activity, ShieldAlert, Zap, Server } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Activity, Zap, Server } from "lucide-react";
+import { motion } from "framer-motion";
 
 const initialNodes = [
   { id: "1", position: { x: 400, y: 50 }, data: { label: "Ingestion Pipeline (SLM)" }, type: "default", className: "custom-node active" },
@@ -34,8 +33,8 @@ const initialEdges = [
 ];
 
 export default function DagViewer() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, onEdgesChange] = useEdgesState(initialEdges);
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
