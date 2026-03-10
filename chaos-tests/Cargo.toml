@@ -1,0 +1,38 @@
+[package]
+name = "chaos-tests"
+version = "0.1.0"
+edition = "2021"
+description = "Chaos engineering test framework for SMA-OS"
+
+[dependencies]
+# Core
+tokio = { version = "1.34", features = ["full"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# HTTP client for health checks
+reqwest = { version = "0.11", features = ["json"] }
+
+# CLI
+clap = { version = "4.4", features = ["derive"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Random for chaos generation
+rand = "0.8"
+
+# Docker integration (for container management)
+bollard = "0.14"
+
+[dev-dependencies]
+tokio-test = "0.4"

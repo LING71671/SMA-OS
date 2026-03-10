@@ -1,0 +1,44 @@
+{
+  "name": "Throughput Benchmark Scenario",
+  "description": "Measures requests/second for SMA-OS operations",
+  "type": "throughput",
+  "config": {
+    "duration_seconds": 30,
+    "ramp_up_seconds": 5,
+    "concurrency_levels": [1, 10, 100, 1000, 10000]
+  },
+  "metrics": {
+    "requests_per_second": {
+      "target": 10000,
+      "minimum_acceptable": 8000
+    },
+    "events_per_second": {
+      "target": 50000,
+      "minimum_acceptable": 40000
+    },
+    "bytes_per_second": {
+      "target": "1GB/s",
+      "minimum_acceptable": "800MB/s"
+    }
+  },
+  "workloads": [
+    {
+      "name": "event_ingestion",
+      "type": "write_heavy",
+      "payload_size": 256,
+      "qps_target": 10000
+    },
+    {
+      "name": "state_query",
+      "type": "read_heavy",
+      "payload_size": 1024,
+      "qps_target": 5000
+    },
+    {
+      "name": "mixed_workload",
+      "type": "mixed",
+      "read_write_ratio": "70:30",
+      "qps_target": 8000
+    }
+  ]
+}

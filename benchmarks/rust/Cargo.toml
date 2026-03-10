@@ -1,0 +1,43 @@
+[package]
+name = "benchmarks"
+version = "0.1.0"
+edition = "2021"
+description = "Performance benchmarks for SMA-OS"
+
+[dependencies]
+# Core
+tokio = { version = "1.34", features = ["full"] }
+anyhow = "1.0"
+
+# Benchmarking
+criterion = "0.5"
+criterion-perf = "0.1"
+
+# HTTP client for latency tests
+reqwest = { version = "0.11", features = ["json"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time
+chrono = "0.4"
+
+# Statistics
+statistics = "0.1"
+
+# Local dependencies (SMA-OS modules)
+state-engine = { path = "../../control-plane/state-engine" }
+fractal-gateway = { path = "../../control-plane/fractal-gateway" }
+
+[[bench]]
+name = "state_engine_bench"
+harness = false
+
+[[bench]]
+name = "latency_bench"
+harness = false
+
+[[bench]]
+name = "throughput_bench"
+harness = false
