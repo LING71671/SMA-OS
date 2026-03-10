@@ -64,8 +64,7 @@ async fn main() -> Result<()> {
         "network-partition" => scenarios::network_partition::run(&config, args.dry_run).await?,
         "resource-exhaustion" => scenarios::resource_exhaustion::run(&config, args.dry_run).await?,
         _ => {
-            eprintln!("Unknown scenario: {}", args.scenario);
-            std::process::exit(1);
+            anyhow::bail!("Unknown scenario: {}", args.scenario);
         }
     }
 

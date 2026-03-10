@@ -71,7 +71,8 @@ impl FractalGatewayEbpf {
 
     /// Add an IP to the blocked list
     pub fn block_ip(&mut self, ip: u32) -> Result<()> {
-        info!("Blocking IP: {}", ip);
+        let ip_str = u32_to_ip(ip);
+        info!("Blocking IP: {} ({})", ip_str, ip);
 
         let blocked_ips = self
             .ebpf
@@ -86,7 +87,8 @@ impl FractalGatewayEbpf {
 
     /// Remove an IP from the blocked list
     pub fn unblock_ip(&mut self, ip: u32) -> Result<()> {
-        info!("Unblocking IP: {}", ip);
+        let ip_str = u32_to_ip(ip);
+        info!("Unblocking IP: {} ({})", ip_str, ip);
 
         let blocked_ips = self
             .ebpf
