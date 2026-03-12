@@ -44,6 +44,40 @@ impl PluginManifest {
             ));
         }
 
+        // Validate name length and characters
+        if self.metadata.name.len() > crate::MAX_PLUGIN_NAME_LENGTH {
+            return Err(PluginError::InvalidManifest(format!(
+                "Plugin name too long: {} > {} characters",
+                self.metadata.name.len(),
+                crate::MAX_PLUGIN_NAME_LENGTH
+            )));
+        }
+
+        // Validate name contains only alphanumeric characters, hyphens, and underscores
+        if !self
+            .metadata
+            .name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(PluginError::InvalidManifest(format!(
+                "Plugin name '{}' contains invalid characters. Use only alphanumeric, hyphens, and underscores",
+                self.metadata.name
+            )));
+        }
+
+        // Validate name doesn't start or end with hyphen/underscore
+        if self.metadata.name.starts_with('-') || self.metadata.name.starts_with('_') {
+            return Err(PluginError::InvalidManifest(
+                "Plugin name cannot start with hyphen or underscore".to_string(),
+            ));
+        }
+        if self.metadata.name.ends_with('-') || self.metadata.name.ends_with('_') {
+            return Err(PluginError::InvalidManifest(
+                "Plugin name cannot end with hyphen or underscore".to_string(),
+            ));
+        }
+
         if self.metadata.version.major == 0
             && self.metadata.version.minor == 0
             && self.metadata.version.patch == 0
@@ -67,6 +101,18 @@ impl PluginManifest {
                     cap
                 )));
             }
+        }
+
+        // Validate resource limits
+        if self.resources.memory_mb == 0 {
+            return Err(PluginError::InvalidManifest(
+                "Memory limit must be greater than 0".to_string(),
+            ));
+        }
+        if self.resources.timeout_secs == 0 {
+            return Err(PluginError::InvalidManifest(
+                "Timeout must be greater than 0".to_string(),
+            ));
         }
 
         Ok(())

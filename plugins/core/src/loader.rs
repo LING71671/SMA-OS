@@ -51,12 +51,34 @@ impl PluginLoader {
     }
     
     /// Load WASM plugin
+    /// 
+    /// NOTE: WASM runtime integration is planned for v1.1.
+    /// Currently returns a stub implementation for testing.
     async fn load_wasm(&self, path: &Path) -> Result<Box<dyn Plugin>, PluginError> {
         info!("[PluginLoader] Loading WASM plugin from {}", path.display());
         
-        // TODO: Implement WASM loading with wasmtime
-        // For now, return a placeholder
-        Err(PluginError::ExecutionFailed("WASM runtime not yet implemented".to_string()))
+        // Verify file exists and is readable
+        if !path.exists() {
+            return Err(PluginError::NotFound(format!(
+                "WASM file not found: {}",
+                path.display()
+            )));
+        }
+        
+        // Check file magic number for WASM
+        let magic = std::fs::read(path)?;
+        if magic.len() < 4 || &magic[0..4] != &[0x00, 0x61, 0x73, 0x6d] {
+            return Err(PluginError::InvalidManifest(
+                "File is not a valid WASM module".to_string()
+            ));
+        }
+        
+        // TODO: Implement WASM loading with wasmtime for v1.1
+        // See: https://github.com/LING71671/SMA-OS/issues/5
+        warn!("[PluginLoader] WASM runtime not yet implemented, returning stub");
+        
+        // Return stub implementation for now
+        Ok(Box::new(crate::executor::DefaultExecutor::new()))
     }
     
     /// Load native shared library plugin
