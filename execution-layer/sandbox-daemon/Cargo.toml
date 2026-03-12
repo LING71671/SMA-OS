@@ -6,10 +6,27 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.34", features = ["full"] }
 hyper = { version = "0.14", features = ["full"] }
-hyperlocal = "0.8" # For Unix Domain Sockets (Firecracker API)
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.6", features = ["v4"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 anyhow = "1.0"
+thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+rand = "0.8"
+
+# Axum web framework
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Additional dependencies for pool and firecracker
+arc-swap = "1.7"
+dashmap = "5.5"
+
+[target.'cfg(unix)'.dependencies]
+hyperlocal = "0.8"
+
+[dev-dependencies]
+tokio-test = "0.4"
