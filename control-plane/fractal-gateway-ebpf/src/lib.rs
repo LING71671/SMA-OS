@@ -1,15 +1,20 @@
 //! Fractal Gateway eBPF Loader
 //!
 //! This module provides functionality to load, manage, and unload
-//! the eBPF XDP program for network filtering.
+//! eBPF programs for:
+//! - XDP network filtering
+//! - cgroup resource monitoring
+//! - O(1) quota enforcement (Phase 2.2)
+
+pub mod cgroup;
+pub mod quota;
 
 use anyhow::Context;
 use anyhow::Result;
-use aya::programs::Xdp;
 use aya::programs::XdpFlags;
+use aya::programs::{CgroupSkb, CgroupSysctl, Xdp};
 use aya::Ebpf;
-use tracing::info;
-use tracing::warn;
+use tracing::{info, warn};
 
 /// Fractal Gateway eBPF manager
 pub struct FractalGatewayEbpf {
@@ -19,7 +24,8 @@ pub struct FractalGatewayEbpf {
 impl FractalGatewayEbpf {
     /// Load the eBPF program from the embedded ELF file
     pub fn load() -> Result<Self> {
-        info!("Loading Fractal Gateway eBPF program");
+        info!("Loading Fractal Gateway eBPF program (Phase 2.2)");
+        info!("Features: XDP filtering, cgroup monitoring, O(1) quota enforcement");
 
         let ebpf = Ebpf::load_elf(include_bytes!(concat!(
             env!("OUT_DIR"),
@@ -28,6 +34,86 @@ impl FractalGatewayEbpf {
         .context("Failed to load eBPF ELF")?;
 
         Ok(Self { ebpf })
+    }
+
+    /// Attach cgroup programs for resource monitoring
+    pub fn attach_cgroup(&mut self, cgroup_path: &str) -> Result<()> {
+        info!("Attaching cgroup programs to: {}", cgroup_path);
+
+        // Attach cgroup_skb for network accounting
+        let cgroup_egress: &mut CgroupSkb = self
+            .ebpf
+            .get_mut("cgroup_net_egress")
+            .and_then(|p| p.try_into())
+            .context("Failed to get cgroup_egress program")?;
+
+        cgroup_egress
+            .attach(cgroup_path, aya::programs::CgroupAttachMode::Egress)
+            .context("Failed to attach cgroup egress")?;
+
+        let cgroup_ingress: &mut CgroupSkb = self
+            .ebpf
+            .get_mut("cgroup_net_ingress")
+            .and_then(|p| p.try_into())
+            .context("Failed to get cgroup_ingress program")?;
+
+        cgroup_ingress
+            .attach(cgroup_path, aya::programs::CgroupAttachMode::Ingress)
+            .context("Failed to attach cgroup ingress")?;
+
+        info!("Cgroup programs attached successfully");
+        Ok(())
+    }
+
+    /// Update process quota - O(1) operation
+    pub fn update_quota(
+        &mut self,
+        pid: u32,
+        agent_id: u32,
+        cpu_multiplier: f64,
+        mem_multiplier: f64,
+        bw_multiplier: f64,
+        priority: u8,
+    ) -> Result<()> {
+        // Convert multipliers to fixed-point (100 = 1.0x)
+        let cpu_mult = (cpu_multiplier * 100.0) as u16;
+        let mem_mult = (mem_multiplier * 100.0) as u16;
+        let bw_mult = (bw_multiplier * 100.0) as u16;
+
+        // Call quota eBPF function
+        unsafe {
+            quota::update_process_quota(pid, agent_id, cpu_mult, mem_mult, bw_mult, priority);
+        }
+
+        info!(
+            "Updated quota for PID {}: CPU={:.2}x, MEM={:.2}x, BW={:.2}x, PRIO={}",
+            pid, cpu_multiplier, mem_multiplier, bw_multiplier, priority
+        );
+
+        Ok(())
+    }
+
+    /// Throttle process - O(1) enforcement
+    pub fn throttle_process(&mut self, pid: u32) -> Result<()> {
+        unsafe {
+            quota::throttle_process(pid);
+        }
+        warn!("Process {} throttled via eBPF", pid);
+        Ok(())
+    }
+
+    /// Unthrottle process - O(1) enforcement
+    pub fn unthrottle_process(&mut self, pid: u32) -> Result<()> {
+        unsafe {
+            quota::unthrottle_process(pid);
+        }
+        info!("Process {} unthrottled via eBPF", pid);
+        Ok(())
+    }
+
+    /// Get process resource usage - O(1)
+    pub fn get_resource_usage(&mut self, pid: u32) -> Result<Option<quota::ResourceUsage>> {
+        unsafe { Ok(quota::get_resource_usage(pid)) }
     }
 
     /// Attach the XDP program to the specified interface
