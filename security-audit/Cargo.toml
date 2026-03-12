@@ -1,0 +1,17 @@
+[package]
+name = "security-audit"
+version = "0.1.0"
+edition = "2021"
+description = "Security audit and penetration testing framework for SMA-OS"
+
+[dependencies]
+tokio = { version = "1.34", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+chrono = "0.4"
+async-trait = "0.1"

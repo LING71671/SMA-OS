@@ -1,0 +1,45 @@
+{
+  "name": "Latency Benchmark Scenario",
+  "description": "Measures P50, P95, P99 latency for SMA-OS operations",
+  "type": "latency",
+  "config": {
+    "warmup_iterations": 100,
+    "measurement_iterations": 1000,
+    "concurrency_levels": [1, 10, 100, 1000],
+    "payload_sizes": [64, 256, 1024, 4096]
+  },
+  "targets": {
+    "state_engine": {
+      "append_event": {
+        "target_p99_ms": 10,
+        "target_throughput": 10000
+      },
+      "query_events": {
+        "target_p99_ms": 20,
+        "target_throughput": 5000
+      }
+    },
+    "fractal_gateway": {
+      "packet_filter": {
+        "target_p99_ms": 1,
+        "target_throughput": 100000
+      }
+    },
+    "orchestration": {
+      "dag_execution": {
+        "target_p99_ms": 50,
+        "target_throughput": 1000
+      }
+    }
+  },
+  "alerts": {
+    "p99_exceeded": {
+      "threshold_ms": 10,
+      "action": "alert"
+    },
+    "throughput_below_target": {
+      "threshold_percent": 80,
+      "action": "alert"
+    }
+  }
+}

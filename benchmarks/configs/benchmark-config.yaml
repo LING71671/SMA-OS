@@ -1,0 +1,56 @@
+# Benchmark Configuration for SMA-OS
+# This file defines benchmark parameters and targets
+
+global:
+  warmup_iterations: 100
+  measurement_iterations: 1000
+  measurement_time_secs: 30
+  sample_size: 100
+
+targets:
+  # Performance targets for Phase 2
+  p99_latency_ms: 10
+  throughput_rps: 10000
+  concurrency: 1000
+  memory_limit_mb: 512
+
+scenarios:
+  - name: state_engine_append
+    type: latency
+    target_p99_ms: 10
+    payload_size_bytes: 256
+    
+  - name: state_engine_query
+    type: latency
+    target_p99_ms: 20
+    batch_size: 100
+    
+  - name: fractal_gateway_filter
+    type: throughput
+    target_rps: 100000
+    packet_size_bytes: 64
+    
+  - name: orchestration_dag
+    type: latency
+    target_p99_ms: 50
+    dag_size: 100
+    
+  - name: memory_bus_ingestion
+    type: throughput
+    target_rps: 50000
+    message_size_bytes: 1024
+
+reporting:
+  format: json
+  output_dir: ./reports
+  include_charts: true
+  compare_with_baseline: true
+
+alerts:
+  enabled: true
+  channels:
+    - type: console
+    - type: file
+  thresholds:
+    p99_latency_ms: 15
+    throughput_degradation_percent: 20

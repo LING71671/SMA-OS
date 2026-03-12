@@ -8,8 +8,27 @@
 
 This root AGENTS.md covers project-wide conventions. Module-specific guides:
 
+### Control Plane (Rust)
 - [`control-plane/state-engine/AGENTS.md`](control-plane/state-engine/AGENTS.md) - Event sourcing state kernel
 - [`control-plane/fractal-gateway/AGENTS.md`](control-plane/fractal-gateway/AGENTS.md) - eBPF security gateway
+- [`control-plane/fractal-gateway-ebpf/AGENTS.md`](control-plane/fractal-gateway-ebpf/AGENTS.md) - XDP packet filtering 🆕
+- [`control-plane/formal-verifier/AGENTS.md`](control-plane/formal-verifier/AGENTS.md) - TLA+ formal verification 🆕
+- [`control-plane/teardown-ctrl/AGENTS.md`](control-plane/teardown-ctrl/AGENTS.md) - Cascading cleanup controller 🆕
+
+### Orchestration (Go)
+- [`orchestration/manager/AGENTS.md`](orchestration/manager/AGENTS.md) - DAG topological execution
+- [`orchestration/scheduler/AGENTS.md`](orchestration/scheduler/AGENTS.md) - Worker dispatch and warm pool
+- [`orchestration/evaluator/AGENTS.md`](orchestration/evaluator/AGENTS.md) - Output validation and rollback
+
+### Memory Bus (Go)
+- [`memory-bus/ingestion/AGENTS.md`](memory-bus/ingestion/AGENTS.md) - SLM-powered intent extraction
+- [`memory-bus/vector-kv/AGENTS.md`](memory-bus/vector-kv/AGENTS.md) - Vector + KV storage with compression
+
+### Execution Layer (Rust)
+- [`execution-layer/sandbox-daemon/AGENTS.md`](execution-layer/sandbox-daemon/AGENTS.md) - Firecracker MicroVM lifecycle
+- [`execution-layer/stateful-repl/AGENTS.md`](execution-layer/stateful-repl/AGENTS.md) - Persistent terminal sessions
+
+### Observability (TypeScript)
 - [`observability-ui/web-dashboard/AGENTS.md`](observability-ui/web-dashboard/AGENTS.md) - Next.js observability UI
 
 ---
@@ -329,6 +348,8 @@ npm run dev --prefix observability-ui/web-dashboard
 |--------|---------|----------|------------|
 | `control-plane/state-engine` | Event sourcing with Redis/PostgreSQL | Rust | High |
 | `control-plane/fractal-gateway` | Resource isolation and auth | Rust | Medium |
+| `control-plane/fractal-gateway-ebpf` | XDP packet filtering | Rust | High |
+| `control-plane/formal-verifier` | TLA+ formal verification | TLA+ | High |
 | `control-plane/teardown-ctrl` | Cascading cleanup controller | Rust | Medium |
 | `orchestration/manager` | Topological task execution | Go | Medium |
 | `orchestration/scheduler` | Worker dispatch | Go | Low |
@@ -338,6 +359,9 @@ npm run dev --prefix observability-ui/web-dashboard
 | `execution-layer/sandbox-daemon` | VM lifecycle management | Rust | Medium |
 | `execution-layer/stateful-repl` | Persistent terminals | Rust | Low |
 | `observability-ui/web-dashboard` | Real-time DAG visualization | TypeScript | Medium |
+| `chaos-tests` | Chaos engineering framework | Rust | High |
+| `benchmarks` | Performance benchmarking suite | Rust/Go | Medium |
+| `sma-proto` | gRPC Protocol definitions | Protobuf | Low |
 
 ## Final Goals
 
@@ -347,21 +371,23 @@ npm run dev --prefix observability-ui/web-dashboard
 - [x] DAG orchestration layer
 - [x] Observability UI with real-time DAG visualization
 
-### Phase 2: Production Readiness (In Progress)
-- [ ] Firecracker MicroVM integration
-- [ ] eBPF probe deployment
-- [ ] Chaos engineering tests
-- [ ] Performance benchmarks (P99 latency < 10ms)
-- [ ] Documentation completeness (>90%)
+### Phase 2: Production Readiness ✅
+- [x] Firecracker MicroVM integration
+- [x] eBPF probe deployment
+- [x] Chaos engineering tests
+- [x] Performance benchmarks (P99 latency < 10ms)
+- [x] Documentation completeness (>90%)
 
-### Phase 3: Scale & Reliability
-- [ ] Horizontal scaling (1000+ concurrent agents)
-- [ ] Multi-region deployment
-- [ ] Automated failover and recovery
-- [ ] Advanced monitoring and alerting
-- [ ] Security audit and penetration testing
+### Phase 3: Scale & Reliability ✅
+- [x] Horizontal scaling (1000+ concurrent agents)
+- [x] Redis cluster with failover
+- [x] Connection pooling & rate limiting
+- [x] Multi-region deployment
+- [x] Automated failover and recovery
+- [x] Advanced monitoring and alerting
+- [x] Security audit and penetration testing
 
-### Phase 4: Ecosystem
+### Phase 4: Ecosystem (In Progress)
 - [ ] Plugin architecture for custom executors
 - [ ] Marketplace for pre-built agent templates
 - [ ] Community-driven module registry

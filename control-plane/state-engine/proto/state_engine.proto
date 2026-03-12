@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package state_engine;
+
+service StateEngine {
+  rpc AppendEvent (AppendEventRequest) returns (AppendEventResponse);
+  rpc GetEvents (GetEventsRequest) returns (GetEventsResponse);
+  rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message AppendEventRequest {
+  string event_id = 1;
+  string tenant_id = 2;
+  string namespace = 3;
+  uint64 version = 4;
+  string payload = 5;
+}
+
+message AppendEventResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetEventsRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  uint64 from_version = 3;
+}
+
+message Event {
+  string event_id = 1;
+  string tenant_id = 2;
+  string namespace = 3;
+  uint64 version = 4;
+  string payload = 5;
+  string timestamp = 6;
+}
+
+message GetEventsResponse {
+  repeated Event events = 1;
+  uint64 count = 2;
+}
+
+message HealthCheckRequest {}
+
+enum HealthStatus {
+  HEALTHY = 0;
+  DEGRADED = 1;
+  UNHEALTHY = 2;
+}
+
+message HealthCheckResponse {
+  int32 status = 1;
+  uint64 request_count = 2;
+  string message = 3;
+}

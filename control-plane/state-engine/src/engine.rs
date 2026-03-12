@@ -50,24 +50,27 @@ impl StateEngine {
             .zadd(&redis_key, event.version as f64, &event_json)
             .await?;
 
+        let tenant_id = event.tenant_id.clone();
+        let namespace = event.namespace.clone();
+
         sqlx::query(
             r#"
-        INSERT INTO hot_events (event_id, tenant_id, namespace, version, payload, timestamp)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (tenant_id, namespace, version) DO NOTHING
-        "#
+            INSERT INTO hot_events (event_id, tenant_id, namespace, version, payload, timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (tenant_id, namespace, version) DO NOTHING
+            "#
         )
-        .bind(&event.event_id)
-        .bind(&event.tenant_id)
-        .bind(&event.namespace)
-        .bind(&(event.version as i64))
-        .bind(&event.payload)
-        .bind(&event.timestamp)
+        .bind(event.event_id)
+        .bind(event.tenant_id)
+        .bind(event.namespace)
+        .bind(event.version as i64)
+        .bind(event.payload)
+        .bind(event.timestamp)
         .execute(&self.pg_pool)
         .await?;
 
-        if event.version > 0 && event.version % 1000 == 0 {
-            self.trigger_snapshot(event.tenant_id, event.namespace, event.version)
+        if event.version > 0 && event.version.is_multiple_of(1000) {
+            self.trigger_snapshot(tenant_id, namespace, event.version)
                 .await?;
         }
 
@@ -91,23 +94,23 @@ impl StateEngine {
 
         sqlx::query(
             r#"
-        INSERT INTO snapshots (snapshot_id, tenant_id, namespace, start_version, end_version, state_blob, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (tenant_id, namespace, end_version) DO NOTHING
-        "#
+            INSERT INTO snapshots (snapshot_id, tenant_id, namespace, start_version, end_version, state_blob, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (tenant_id, namespace, end_version) DO NOTHING
+            "#
         )
-        .bind(&snapshot_id)
-        .bind(&tenant_id)
-        .bind(&namespace)
-        .bind(&(current_version.saturating_sub(1000) as i64))
-        .bind(&(current_version as i64))
-        .bind(&state_blob)
-        .bind(&chrono::Utc::now().timestamp())
+        .bind(snapshot_id)
+        .bind(tenant_id)
+        .bind(namespace)
+        .bind(current_version.saturating_sub(1000) as i64)
+        .bind(current_version as i64)
+        .bind(state_blob)
+        .bind(chrono::Utc::now().timestamp())
         .execute(&self.pg_pool)
         .await?;
 
         Ok(())
-    }
+}
 
     // ============================================================
     // Query Interfaces - Task 1.1
@@ -163,11 +166,11 @@ impl StateEngine {
         let events: Vec<StateEvent> = match to_version {
             None => {
                 let sql = r#"
-                SELECT event_id, tenant_id, namespace, version, payload, timestamp
-                FROM hot_events
-                WHERE tenant_id = $1 AND namespace = $2 AND version >= $3
-                ORDER BY version ASC
-                "#;
+SELECT event_id, tenant_id, namespace, version, payload, timestamp
+FROM hot_events
+WHERE tenant_id = $1 AND namespace = $2 AND version >= $3
+ORDER BY version ASC
+"#;
                 let rows = sqlx::query(sql)
                     .bind(tenant_id)
                     .bind(namespace)
@@ -190,11 +193,11 @@ impl StateEngine {
             }
             Some(to) => {
                 let sql = r#"
-                SELECT event_id, tenant_id, namespace, version, payload, timestamp
-                FROM hot_events
-                WHERE tenant_id = $1 AND namespace = $2 AND version >= $3 AND version <= $4
-                ORDER BY version ASC
-                "#;
+SELECT event_id, tenant_id, namespace, version, payload, timestamp
+FROM hot_events
+WHERE tenant_id = $1 AND namespace = $2 AND version >= $3 AND version <= $4
+ORDER BY version ASC
+"#;
                 let rows = sqlx::query(sql)
                     .bind(tenant_id)
                     .bind(namespace)
@@ -204,15 +207,15 @@ impl StateEngine {
                     .await?;
 
                 rows.into_iter()
-                    .filter_map(|row| {
-                        Some(StateEvent {
+                    .map(|row| {
+                        StateEvent {
                             event_id: row.get("event_id"),
                             tenant_id: row.get("tenant_id"),
                             namespace: row.get("namespace"),
                             version: row.get::<i64, _>("version") as u64,
                             payload: row.get("payload"),
                             timestamp: row.get("timestamp"),
-                        })
+                        }
                     })
                     .collect()
             }
@@ -244,12 +247,12 @@ impl StateEngine {
         namespace: &str,
     ) -> Result<Option<Snapshot>, EngineError> {
         let sql = r#"
-        SELECT snapshot_id, tenant_id, namespace, start_version, end_version, state_blob, created_at
-        FROM snapshots
-        WHERE tenant_id = $1 AND namespace = $2
-        ORDER BY end_version DESC
-        LIMIT 1
-        "#;
+SELECT snapshot_id, tenant_id, namespace, start_version, end_version, state_blob, created_at
+FROM snapshots
+WHERE tenant_id = $1 AND namespace = $2
+ORDER BY end_version DESC
+LIMIT 1
+"#;
         let row = sqlx::query(sql)
             .bind(tenant_id)
             .bind(namespace)
@@ -293,10 +296,10 @@ impl StateEngine {
 
         // Fallback to PostgreSQL
         let sql = r#"
-        SELECT event_id, tenant_id, namespace, version, payload, timestamp
-        FROM hot_events
-        WHERE tenant_id = $1 AND namespace = $2 AND version = $3
-        "#;
+SELECT event_id, tenant_id, namespace, version, payload, timestamp
+FROM hot_events
+WHERE tenant_id = $1 AND namespace = $2 AND version = $3
+"#;
         let row = sqlx::query(sql)
             .bind(tenant_id)
             .bind(namespace)

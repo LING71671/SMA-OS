@@ -1,0 +1,40 @@
+# Chaos Test Configuration for SMA-OS
+# This file defines the chaos testing parameters
+
+cluster:
+  docker_compose_file: "../../docker-compose.yml"
+  services:
+    - state-engine
+    - fractal-gateway
+    - orchestration-manager
+    - memory-bus-ingestion
+  health_check_url: "http://localhost:8080/health"
+
+scenarios:
+  - name: "Node Failure Test"
+    type: "node_failure"
+    duration: 30
+    probability: 1.0
+    targets:
+      - state-engine
+      - fractal-gateway
+
+  - name: "Network Partition Test"
+    type: "network_partition"
+    duration: 60
+    probability: 0.8
+    targets:
+      - state-engine
+      - orchestration-manager
+
+  - name: "Resource Exhaustion Test"
+    type: "resource_exhaustion"
+    duration: 45
+    probability: 0.5
+    targets:
+      - memory-bus-ingestion
+
+timeouts:
+  scenario_timeout_secs: 300
+  recovery_timeout_secs: 30
+  health_check_interval_secs: 5

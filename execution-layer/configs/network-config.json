@@ -1,0 +1,70 @@
+{
+  "default_gateway": "192.168.1.1",
+  "dns_servers": ["8.8.8.8", "1.1.1.1"],
+  "interfaces": [
+    {
+      "iface_id": "eth0",
+      "guest_mac": "02:00:00:00:00:01",
+      "ip_address": "192.168.1.2",
+      "subnet_mask": "255.255.255.0",
+      "host_dev_name": "tap0",
+      "enable_dhcp": false,
+      "mtu": 1500
+    },
+    {
+      "iface_id": "eth1",
+      "guest_mac": "02:00:00:00:00:02",
+      "ip_address": "10.0.0.2",
+      "subnet_mask": "255.255.255.0",
+      "host_dev_name": "tap1",
+      "enable_dhcp": false,
+      "mtu": 1500
+    }
+  ],
+  "firewall_rules": [
+    {
+      "direction": "inbound",
+      "protocol": "tcp",
+      "port": 22,
+      "action": "allow",
+      "description": "Allow SSH"
+    },
+    {
+      "direction": "inbound",
+      "protocol": "tcp",
+      "port": 443,
+      "action": "allow",
+      "description": "Allow HTTPS"
+    },
+    {
+      "direction": "outbound",
+      "protocol": "tcp",
+      "port": 443,
+      "action": "allow",
+      "description": "Allow outbound HTTPS"
+    },
+    {
+      "direction": "outbound",
+      "protocol": "udp",
+      "port": 53,
+      "action": "allow",
+      "description": "Allow outbound DNS"
+    }
+  ],
+  "nat_rules": [
+    {
+      "external_ip": "0.0.0.0",
+      "external_port": 2222,
+      "internal_ip": "192.168.1.2",
+      "internal_port": 22,
+      "protocol": "tcp",
+      "description": "Port forward SSH from external 2222 to VM 22"
+    }
+  ],
+  "socket_mode": {
+    "api_socket": "/tmp/firecracker.socket",
+    "vsock_enabled": true,
+    "vsock_path": "/tmp/firecracker-vsock.socket",
+    "metrics_socket": "/tmp/firecracker-metrics.json"
+  }
+}

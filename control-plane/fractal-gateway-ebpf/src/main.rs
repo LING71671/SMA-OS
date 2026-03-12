@@ -1,3 +1,8 @@
+//! Fractal Gateway eBPF - Main Entry Point
+//!
+//! This program demonstrates loading and managing the eBPF XDP program
+//! for network filtering and IP blocking.
+
 #![no_std]
 #![no_main]
 
@@ -13,7 +18,7 @@ use network_types::{
     ip::Ipv4Hdr,
 };
 
-// Define an eBPF Map to store blocked destination/source IP addresses dynamically
+// Define a eBPF Map to store blocked destination/source IP addresses dynamically
 #[map]
 static BLOCKED_IPS: HashMap<u32, u8> = HashMap::with_max_entries(1024, 0);
 
@@ -40,7 +45,10 @@ fn try_fractal_gateway(ctx: XdpContext) -> Result<u32, ()> {
     // Look up the packet's source IP in the BPF Map
     // If it exists in BLOCKED_IPS, we DROP it at the nanosecond kernel level
     if unsafe { BLOCKED_IPS.get(&source) }.is_some() {
-        info!(&ctx, "!!! FRACTAL SHIELD TRIGGERED: Dropping packet from blocked IP !!!");
+        info!(
+            &ctx,
+            "!!! FRACTAL SHIELD TRIGGERED: Dropping packet from blocked IP !!!"
+        );
         return Ok(xdp_action::XDP_DROP);
     }
 

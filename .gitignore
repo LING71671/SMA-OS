@@ -4,8 +4,9 @@
 .vscode/
 
 # Rust
-/target/
+target/
 **/*.rs.bk
+Cargo.lock
 
 # Go
 bin/

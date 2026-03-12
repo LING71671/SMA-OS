@@ -1,0 +1,44 @@
+{
+  "small": {
+    "description": "Small VM for lightweight workloads (e.g., simple scripts, quick tasks)",
+    "vcpu_count": 1,
+    "memory_size_mib": 128,
+    "max_connections": 10,
+    "timeout_seconds": 30,
+    "resource_limits": {
+      "cpu_shares": 256,
+      "memory_limit": "128M",
+      "disk_quota": "1G"
+    }
+  },
+  "medium": {
+    "description": "Medium VM for standard workloads (e.g., typical agent execution)",
+    "vcpu_count": 2,
+    "memory_size_mib": 512,
+    "max_connections": 50,
+    "timeout_seconds": 120,
+    "resource_limits": {
+      "cpu_shares": 512,
+      "memory_limit": "512M",
+      "disk_quota": "5G"
+    }
+  },
+  "large": {
+    "description": "Large VM for heavy workloads (e.g., data processing, complex computations)",
+    "vcpu_count": 4,
+    "memory_size_mib": 2048,
+    "max_connections": 200,
+    "timeout_seconds": 600,
+    "resource_limits": {
+      "cpu_shares": 1024,
+      "memory_limit": "2G",
+      "disk_quota": "20G"
+    }
+  },
+  "default": "medium",
+  "cpu_template": "C3",
+  "enable_ht": false,
+  "enable_smt": false,
+  "vsock_cid_base": 3,
+  "socket_dir": "/tmp"
+}
