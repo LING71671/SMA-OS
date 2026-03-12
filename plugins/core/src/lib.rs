@@ -19,7 +19,15 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
+use tracing::warn;
 use uuid::Uuid;
+
+/// Default tenant ID for plugin initialization
+pub const DEFAULT_TENANT_ID: &str = "default";
+/// Default namespace for plugin initialization
+pub const DEFAULT_NAMESPACE: &str = "default";
+/// Maximum plugin name length
+pub const MAX_PLUGIN_NAME_LENGTH: usize = 100;
 
 /// Plugin trait that all plugins must implement
 #[async_trait]
