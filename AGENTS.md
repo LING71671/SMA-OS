@@ -8,8 +8,24 @@
 
 This root AGENTS.md covers project-wide conventions. Module-specific guides:
 
+### Control Plane (Rust)
 - [`control-plane/state-engine/AGENTS.md`](control-plane/state-engine/AGENTS.md) - Event sourcing state kernel
 - [`control-plane/fractal-gateway/AGENTS.md`](control-plane/fractal-gateway/AGENTS.md) - eBPF security gateway
+
+### Orchestration (Go)
+- [`orchestration/manager/AGENTS.md`](orchestration/manager/AGENTS.md) - DAG topological execution
+- [`orchestration/scheduler/AGENTS.md`](orchestration/scheduler/AGENTS.md) - Worker dispatch and warm pool
+- [`orchestration/evaluator/AGENTS.md`](orchestration/evaluator/AGENTS.md) - Output validation and rollback
+
+### Memory Bus (Go)
+- [`memory-bus/ingestion/AGENTS.md`](memory-bus/ingestion/AGENTS.md) - SLM-powered intent extraction
+- [`memory-bus/vector-kv/AGENTS.md`](memory-bus/vector-kv/AGENTS.md) - Vector + KV storage with compression
+
+### Execution Layer (Rust)
+- [`execution-layer/sandbox-daemon/AGENTS.md`](execution-layer/sandbox-daemon/AGENTS.md) - Firecracker MicroVM lifecycle
+- [`execution-layer/stateful-repl/AGENTS.md`](execution-layer/stateful-repl/AGENTS.md) - Persistent terminal sessions
+
+### Observability (TypeScript)
 - [`observability-ui/web-dashboard/AGENTS.md`](observability-ui/web-dashboard/AGENTS.md) - Next.js observability UI
 
 ---
