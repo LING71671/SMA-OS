@@ -69,20 +69,27 @@ impl PluginRegistry {
             }
         }
         
-        // Initialize plugin
+        // Initialize plugin with cleanup on failure
         let mut plugin_guard = plugin;
         let config = PluginConfig {
             plugin_id,
-            tenant_id: "default".to_string(),
-            namespace: "default".to_string(),
+            tenant_id: crate::DEFAULT_TENANT_ID.to_string(),
+            namespace: crate::DEFAULT_NAMESPACE.to_string(),
             config: Default::default(),
             resource_limits: manifest.resources.clone(),
         };
-        
-        plugin_guard.init(config).await.map_err(|e| {
-            PluginError::ExecutionFailed(format!("Failed to initialize plugin: {}", e))
-        })?;
-        
+
+        // Try to initialize - if it fails, attempt cleanup
+        let init_result = plugin_guard.init(config).await;
+        if let Err(ref e) = init_result {
+            // Attempt graceful cleanup of partially initialized plugin
+            warn!("[PluginRegistry] Plugin {} init failed: {}, attempting cleanup", metadata.name, e);
+            let _ = plugin_guard.shutdown().await;
+            return Err(PluginError::ExecutionFailed(format!(
+                "Failed to initialize plugin: {}", e
+            )));
+        }
+
         // Store plugin
         self.plugins.insert(plugin_id, Arc::new(RwLock::new(plugin_guard)));
         self.manifests.insert(plugin_id, manifest);

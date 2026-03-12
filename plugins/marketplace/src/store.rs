@@ -96,17 +96,17 @@ impl MarketplaceStore {
             ));
         }
 
-        // Create install directory
-        std::fs::create_dir_all(&install_path)?;
+        // Create install directory (async)
+        tokio::fs::create_dir_all(&install_path).await?;
 
-        // Copy plugin binary
+        // Copy plugin binary (async)
         let dest = install_path.join("plugin.wasm");
-        std::fs::copy(&cache_path, &dest)?;
+        tokio::fs::copy(&cache_path, &dest).await?;
 
-        // Write manifest
+        // Write manifest (async)
         let manifest = install_path.join("manifest.json");
         let manifest_json = serde_json::to_string_pretty(entry)?;
-        std::fs::write(&manifest, manifest_json)?;
+        tokio::fs::write(&manifest, manifest_json).await?;
 
         info!(
             "[Store] Installed {} v{} to {}",
