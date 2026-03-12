@@ -14,3 +14,10 @@ thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 chrono = "0.4"
+
+# Phase 3: Scaling dependencies
+dashmap = "5.5"
+arc-swap = "1.7"
+governor = "0.2"
+deadpool = "0.10"
+async-trait = "0.1"
