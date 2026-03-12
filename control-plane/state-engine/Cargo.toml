@@ -21,6 +21,5 @@ arc-swap = "1.7"
 governor = "0.2"
 deadpool = "0.10"
 async-trait = "0.1"
-# TODO: Phase 3.1b - Add tonic/prost for gRPC when protoc is available
-# tonic = "0.11"
-# prost = "0.12"
+prometheus = "0.13"
+hyper = { version = "0.14", features = ["full"] }
