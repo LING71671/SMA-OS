@@ -390,10 +390,6 @@ npm run dev --prefix observability-ui/web-dashboard
 ### Phase 4: Ecosystem (In Progress)
 - [ ] Plugin architecture for custom executors
 - [ ] Marketplace for pre-built agent templates
-
-### Phase 4: Ecosystem
-- [ ] Plugin architecture for custom executors
-- [ ] Marketplace for pre-built agent templates
 - [ ] Community-driven module registry
 - [ ] Enterprise support and SLA
 
