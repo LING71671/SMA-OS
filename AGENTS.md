@@ -11,6 +11,9 @@ This root AGENTS.md covers project-wide conventions. Module-specific guides:
 ### Control Plane (Rust)
 - [`control-plane/state-engine/AGENTS.md`](control-plane/state-engine/AGENTS.md) - Event sourcing state kernel
 - [`control-plane/fractal-gateway/AGENTS.md`](control-plane/fractal-gateway/AGENTS.md) - eBPF security gateway
+- [`control-plane/fractal-gateway-ebpf/AGENTS.md`](control-plane/fractal-gateway-ebpf/AGENTS.md) - XDP packet filtering 🆕
+- [`control-plane/formal-verifier/AGENTS.md`](control-plane/formal-verifier/AGENTS.md) - TLA+ formal verification 🆕
+- [`control-plane/teardown-ctrl/AGENTS.md`](control-plane/teardown-ctrl/AGENTS.md) - Cascading cleanup controller 🆕
 
 ### Orchestration (Go)
 - [`orchestration/manager/AGENTS.md`](orchestration/manager/AGENTS.md) - DAG topological execution
@@ -345,6 +348,8 @@ npm run dev --prefix observability-ui/web-dashboard
 |--------|---------|----------|------------|
 | `control-plane/state-engine` | Event sourcing with Redis/PostgreSQL | Rust | High |
 | `control-plane/fractal-gateway` | Resource isolation and auth | Rust | Medium |
+| `control-plane/fractal-gateway-ebpf` | XDP packet filtering | Rust | High |
+| `control-plane/formal-verifier` | TLA+ formal verification | TLA+ | High |
 | `control-plane/teardown-ctrl` | Cascading cleanup controller | Rust | Medium |
 | `orchestration/manager` | Topological task execution | Go | Medium |
 | `orchestration/scheduler` | Worker dispatch | Go | Low |
@@ -354,6 +359,9 @@ npm run dev --prefix observability-ui/web-dashboard
 | `execution-layer/sandbox-daemon` | VM lifecycle management | Rust | Medium |
 | `execution-layer/stateful-repl` | Persistent terminals | Rust | Low |
 | `observability-ui/web-dashboard` | Real-time DAG visualization | TypeScript | Medium |
+| `chaos-tests` | Chaos engineering framework | Rust | High |
+| `benchmarks` | Performance benchmarking suite | Rust/Go | Medium |
+| `sma-proto` | gRPC Protocol definitions | Protobuf | Low |
 
 ## Final Goals
 
