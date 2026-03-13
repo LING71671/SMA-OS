@@ -75,7 +75,7 @@ impl MarketplaceStore {
     }
 
     /// Install plugin from cache
-    pub fn install(
+    pub async fn install(
         &self,
         entry: &MarketplaceEntry,
     ) -> Result<std::path::PathBuf, MarketplaceError> {

@@ -61,6 +61,7 @@ func (dm *DAGManager) Execute() error {
 
 	readyQueue := make(chan *TaskNode, len(dm.Nodes))
 	completionChan := make(chan string, len(dm.Nodes))
+	dispatcherDone := make(chan struct{})
 	var wg sync.WaitGroup
 
 	// 1. Enqueue all initial nodes with 0 in-degree
@@ -77,6 +78,7 @@ func (dm *DAGManager) Execute() error {
 
 	// 2. Dispatch loop
 	go func() {
+		defer close(dispatcherDone)
 		for {
 			select {
 			case task := <-readyQueue:
@@ -118,10 +120,9 @@ func (dm *DAGManager) Execute() error {
 		}
 	}()
 
+	// Wait for dispatcher to finish (all tasks completed)
+	<-dispatcherDone
 	// Wait for all actual worker routines to finish
-	// (in a real scenario we'd track the overarching DAG finish)
-	// We use sleep here to let the dispatch daemon finish for the demo.
-	time.Sleep(2 * time.Second)
 	wg.Wait()
 	return nil
 }

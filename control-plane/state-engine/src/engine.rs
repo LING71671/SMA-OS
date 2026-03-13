@@ -14,6 +14,8 @@ pub enum EngineError {
     Postgres(#[from] sqlx::Error),
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+    #[error("Database migration error: {0}")]
+    Migration(String),
 }
 
 /// Durable State Engine
@@ -34,7 +36,7 @@ impl StateEngine {
         sqlx::migrate!("./migrations")
             .run(&pg_pool)
             .await
-            .expect("Failed to execute database migrations");
+            .map_err(|e| EngineError::Migration(e.to_string()))?;
 
         Ok(Self {
             redis_client,
