@@ -41,7 +41,10 @@ async fn main() -> Result<(), anyhow::Error> {
         warn!("failed to initialize eBPF logger: {}", e);
     }
 
-    let program: &mut Xdp = bpf.program_mut("fractal_gateway").unwrap().try_into()?;
+    let program: &mut Xdp = bpf
+        .program_mut("fractal_gateway")
+        .context("failed to find eBPF program 'fractal_gateway' - ensure the eBPF code is compiled")?
+        .try_into()?;
     program.load()?;
     program.attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program with default flags")?;
@@ -51,7 +54,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // -----------------------------------------------------
     // Dynamic BPF Map Manipulation (Rule Injection)
     // -----------------------------------------------------
-    let mut blocked_ips: HashMap<_, u32, u8> = HashMap::try_from(bpf.map_mut("BLOCKED_IPS").unwrap())?;
+    let mut blocked_ips: HashMap<_, u32, u8> = HashMap::try_from(
+        bpf.map_mut("BLOCKED_IPS")
+            .context("failed to find eBPF map 'BLOCKED_IPS' - ensure the eBPF code is compiled")?,
+    )?;
     
     // Example: Block IP 192.168.1.100 (in network-byte order)
     let malicious_ip: u32 = u32::from_be_bytes([192, 168, 1, 100]);

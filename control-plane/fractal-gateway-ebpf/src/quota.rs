@@ -242,9 +242,29 @@ pub struct ProbeContext {
 }
 
 impl ProbeContext {
-    fn arg<T>(&self, n: usize) -> Option<T> {
-        // Simplified argument extraction
-        None
+    /// Extract syscall argument from pt_regs
+    ///
+    /// # Safety
+    /// Requires valid pt_regs pointer from eBPF probe context
+    unsafe fn arg<T: Copy>(&self, n: usize) -> Option<T> {
+        if self.regs.is_null() {
+            return None;
+        }
+
+        // x86_64: arguments are in rdi, rsi, rdx, rcx, r8, r9 (indices 0-5)
+        // For syscalls, orig_rax holds the syscall number, then args follow
+        // Note: pt_regs field names depend on the architecture
+        let arg_ptr = match n {
+            0 => core::ptr::addr_of!((*self.regs).di),
+            1 => core::ptr::addr_of!((*self.regs).si),
+            2 => core::ptr::addr_of!((*self.regs).dx),
+            3 => core::ptr::addr_of!((*self.regs).cx),
+            4 => core::ptr::addr_of!((*self.regs).r8),
+            5 => core::ptr::addr_of!((*self.regs).r9),
+            _ => return None,
+        };
+
+        Some(core::ptr::read(arg_ptr as *const T))
     }
 }
 
@@ -253,7 +273,31 @@ pub struct LsmContext {
     // LSM context
 }
 
-// Placeholder for bpf_ktime_get_ns
+/// Get current time in nanoseconds from eBPF helper
+///
+/// # Safety
+/// This is safe to call from eBPF programs as it uses the bpf_ktime_get_ns kernel helper
 unsafe fn bpf_ktime_get_ns() -> u64 {
-    0 // Placeholder
+    // Use aya_ebpf::helpers::bpf_ktime_get_ns if available, otherwise implement via inline asm
+    #[cfg(target_arch = "bpf")]
+    {
+        // On BPF target, use the actual eBPF helper
+        // Helper number 5 is bpf_ktime_get_ns
+        let time_ns: u64;
+        core::arch::asm!(
+            "call 5",
+            out("r0") time_ns,
+            options(nomem, nostack, preserves_flags)
+        );
+        time_ns
+    }
+
+    #[cfg(not(target_arch = "bpf"))]
+    {
+        // For testing on non-BPF targets, return a monotonic counter
+        // In production, this should never be reached
+        use core::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    }
 }
