@@ -1,13 +1,44 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-// TaskStatus represents the lifecycle of a task
+// FailureConfig defines retry and timeout configuration
+type FailureConfig struct {
+	MaxRetries         int
+	RetryDelay         time.Duration
+	Timeout            time.Duration
+	CancelOnParentFail bool
+}
+
+// TaskResult represents the result of task execution
+type TaskResult struct {
+	TaskID    string
+	Status    TaskStatus
+	Error     error
+	StartTime time.Time
+	EndTime   time.Time
+	RetryCnt  int
+}
+
+// DefaultFailureConfig returns default configuration
+func DefaultFailureConfig() FailureConfig {
+	return FailureConfig{
+		MaxRetries:         3,
+		RetryDelay:         100 * time.Millisecond,
+		Timeout:            30 * time.Second,
+		CancelOnParentFail: true,
+	}
+}
+
 type TaskStatus string
 
 const (
@@ -28,15 +59,17 @@ type TaskNode struct {
 
 // Orchestrator Manager responsible for Topological Execution
 type DAGManager struct {
-	Nodes    map[string]*TaskNode
-	inDegree map[string]int
-	mu       sync.Mutex
+	Nodes         map[string]*TaskNode
+	inDegree      map[string]int
+	mu            sync.Mutex
+	FailureConfig FailureConfig
 }
 
-func NewDAGManager() *DAGManager {
+func NewDAGManager(config FailureConfig) *DAGManager {
 	return &DAGManager{
-		Nodes:    make(map[string]*TaskNode),
-		inDegree: make(map[string]int),
+		Nodes:         make(map[string]*TaskNode),
+		inDegree:      make(map[string]int),
+		FailureConfig: config,
 	}
 }
 
@@ -60,7 +93,7 @@ func (dm *DAGManager) Execute() error {
 	log.Println("[Manager] Starting Topologically Sorted DAG Execution...")
 
 	readyQueue := make(chan *TaskNode, len(dm.Nodes))
-	completionChan := make(chan string, len(dm.Nodes))
+	completionChan := make(chan *TaskResult, len(dm.Nodes))
 	dispatcherDone := make(chan struct{})
 	var wg sync.WaitGroup
 
@@ -74,7 +107,7 @@ func (dm *DAGManager) Execute() error {
 	dm.mu.Unlock()
 
 	totalTasks := len(dm.Nodes)
-	completedTasks := 0
+	var completedTasks int32 = 0
 
 	// 2. Dispatch loop
 	go func() {
@@ -86,9 +119,9 @@ func (dm *DAGManager) Execute() error {
 				// Simulating Worker assignment (e.g. gRPC to Firecracker MicroVM pool)
 				go dm.dispatchWorker(task, completionChan, &wg)
 
-			case completedID := <-completionChan:
-				completedTasks++
-				log.Printf("[Manager] Registered COMPLETION event for Task: %s", completedID)
+			case res := <-completionChan:
+				atomic.AddInt32(&completedTasks, 1)
+				log.Printf("[Manager] Registered COMPLETION event for Task: %s", res.TaskID)
 
 				// Calculate dependents and decrement their in-degrees
 				dm.mu.Lock()
@@ -97,7 +130,7 @@ func (dm *DAGManager) Execute() error {
 						// Check if completedID is in dependencies
 						hasDep := false
 						for _, d := range node.Dependencies {
-							if d == completedID {
+							if d == res.TaskID {
 								hasDep = true
 								break
 							}
@@ -112,7 +145,7 @@ func (dm *DAGManager) Execute() error {
 				}
 				dm.mu.Unlock()
 
-				if completedTasks == totalTasks {
+				if int(atomic.LoadInt32(&completedTasks)) == totalTasks {
 					log.Println("[Manager] All tasks in DAG completed successfully!")
 					return // End execution mapping
 				}
@@ -127,19 +160,80 @@ func (dm *DAGManager) Execute() error {
 	return nil
 }
 
-func (dm *DAGManager) dispatchWorker(task *TaskNode, done chan<- string, wg *sync.WaitGroup) {
+func (dm *DAGManager) dispatchWorker(task *TaskNode, done chan<- *TaskResult, wg *sync.WaitGroup) {
 	defer wg.Done()
-
 	task.Status = Running
-	log.Printf("[Worker Scheduler] -> Dispatching Task [%s] (%s) to Firecracker Warm Pool...", task.ID, task.ActionName)
+	start := time.Now()
+	var lastErr error
+	retryCount := 0
 
-	// Simulate work duration
+	// Retry loop
+	for attempt := 0; attempt <= dm.FailureConfig.MaxRetries; attempt++ {
+		if attempt > 0 {
+			// Calculate backoff delay
+			delay := time.Duration(float64(dm.FailureConfig.RetryDelay) * math.Pow(2, float64(attempt-1)))
+			if delay > 5*time.Second {
+				delay = 5 * time.Second // Cap at 5s
+			}
+			log.Printf("[Worker] Task %s retry %d/%d after %v", task.ID, attempt, dm.FailureConfig.MaxRetries, delay)
+			time.Sleep(delay)
+			retryCount++
+		}
+
+		// Create timeout context
+		ctx, cancel := context.WithTimeout(context.Background(), dm.FailureConfig.Timeout)
+
+		// Execute task with timeout
+		resultChan := make(chan error, 1)
+		go func() {
+			resultChan <- dm.executeTask(task)
+		}()
+
+		select {
+		case err := <-resultChan:
+			cancel()
+			if err == nil {
+				// Success
+				task.Status = Completed
+				done <- &TaskResult{
+					TaskID:    task.ID,
+					Status:    Completed,
+					Error:     nil,
+					StartTime: start,
+					EndTime:   time.Now(),
+					RetryCnt:  retryCount,
+				}
+				log.Printf("[Worker] Task %s completed (retries: %d)", task.ID, retryCount)
+				return
+			}
+			lastErr = err
+			log.Printf("[Worker] Task %s failed (attempt %d/%d): %v", task.ID, attempt+1, dm.FailureConfig.MaxRetries+1, err)
+		case <-ctx.Done():
+			cancel()
+			lastErr = fmt.Errorf("task timeout after %v", dm.FailureConfig.Timeout)
+			log.Printf("[Worker] Task %s timeout (attempt %d/%d)", task.ID, attempt+1, dm.FailureConfig.MaxRetries+1)
+		}
+	}
+
+	// All retries exhausted
+	task.Status = Failed
+	done <- &TaskResult{
+		TaskID:    task.ID,
+		Status:    Failed,
+		Error:     lastErr,
+		StartTime: start,
+		EndTime:   time.Now(),
+		RetryCnt:  retryCount,
+	}
+	log.Printf("[Worker] Task %s failed after %d retries: %v", task.ID, retryCount, lastErr)
+}
+
+// executeTask performs actual task execution
+func (dm *DAGManager) executeTask(task *TaskNode) error {
+	log.Printf("[Worker Scheduler] -> Executing Task [%s] (%s)...", task.ID, task.ActionName)
 	time.Sleep(500 * time.Millisecond)
-
-	task.Status = Completed
-	log.Printf("[Worker Scheduler] <- Task [%s] completed successfully. Cascading state...", task.ID)
-
-	done <- task.ID
+	// Success
+	return nil
 }
 
 func main() {
@@ -158,7 +252,7 @@ func main() {
 		log.Fatalf("JSON parse error: %v", err)
 	}
 
-	manager := NewDAGManager()
+	manager := NewDAGManager(DefaultFailureConfig())
 	for _, t := range tasks {
 		t.Status = Pending
 		manager.AddTask(t)

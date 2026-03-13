@@ -7,7 +7,7 @@ import (
 
 // TestDAGManager_AddTask tests adding tasks to the DAG
 func TestDAGManager_AddTask(t *testing.T) {
-	manager := NewDAGManager()
+	manager := NewDAGManager(DefaultFailureConfig())
 
 	// Test adding a single task
 	task := TaskNode{
@@ -35,7 +35,7 @@ func TestDAGManager_AddTask(t *testing.T) {
 
 // TestDAGManager_AddTaskWithDependencies tests adding tasks with dependencies
 func TestDAGManager_AddTaskWithDependencies(t *testing.T) {
-	manager := NewDAGManager()
+	manager := NewDAGManager(DefaultFailureConfig())
 
 	// Add parent task
 	parent := TaskNode{
@@ -72,7 +72,7 @@ func TestDAGManager_AddTaskWithDependencies(t *testing.T) {
 
 // TestDAGManager_Execute tests the DAG execution
 func TestDAGManager_Execute(t *testing.T) {
-	manager := NewDAGManager()
+	manager := NewDAGManager(DefaultFailureConfig())
 
 	// Create a simple DAG: T1 -> T2
 	t1 := TaskNode{
@@ -113,7 +113,7 @@ func TestDAGManager_Execute(t *testing.T) {
 
 // TestDAGManager_EmptyDAG tests execution of empty DAG
 func TestDAGManager_EmptyDAG(t *testing.T) {
-	manager := NewDAGManager()
+	manager := NewDAGManager(DefaultFailureConfig())
 
 	// Execute empty DAG should not panic
 	err := manager.Execute()
@@ -151,7 +151,7 @@ func TestTaskStatusTransitions(t *testing.T) {
 
 // TestDAGManager_ConcurrentAccess tests thread safety
 func TestDAGManager_ConcurrentAccess(t *testing.T) {
-	manager := NewDAGManager()
+	manager := NewDAGManager(DefaultFailureConfig())
 
 	// Add tasks concurrently
 	done := make(chan bool, 10)
