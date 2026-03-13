@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
