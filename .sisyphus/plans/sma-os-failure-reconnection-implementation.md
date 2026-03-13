@@ -471,6 +471,130 @@ Max Concurrent: 4 (Wave 2)
 
 ---
 
+### Wave 3: Integration (After Wave 2)
+
+- [ ] **Task 8: DAG Manager - 与 state-engine 集成**
+
+  **What to do**:
+  - 任务失败时发送事件到 state-engine
+  - 任务重试时记录重试次数
+  - 从 state-engine 读取失败配置
+  
+  **Must NOT do**:
+  - 不实现 state-engine 的事件处理器（假设已存在）
+  
+  **Recommended Agent Profile**:
+  - **Category**: unspecified-high
+  - **Skills**: []
+  
+  **Parallelization**:
+  - **Can Run In Parallel**: YES (与 Task 9 并行)
+  - **Parallel Group**: Wave 3
+  - **Blocks**: Task 10
+  - **Blocked By**: Task 1, Task 4
+  
+  **References**:
+  - `control-plane/state-engine/src/engine.rs:47-80` - append_event 模式
+  
+  **Acceptance Criteria**:
+  - [ ] 任务失败事件被正确发送到 state-engine
+  - [ ] 重试次数被正确记录
+  
+  **QA Scenarios**:
+  - Tool: Bash
+  - Steps:
+    1. 启动 state-engine mock
+    2. 运行失败任务测试
+    3. 验证事件被发送
+  - Expected Result: 事件正确记录
+  - Evidence: .sisyphus/evidence/task-8-integration.txt
+  
+  **Commit**: YES
+  - Message: `feat(manager): integrate with state-engine for failure events`
+  - Files: `orchestration/manager/main.go`
+
+---
+
+- [ ] **Task 9: Worker Scheduler - 事件广播**
+
+  **What to do**:
+  - 实现 Worker 故障事件广播
+  - 使用 channel 或回调机制通知订阅者
+  - 参考 FailoverManager 的事件模式
+  
+  **Must NOT do**:
+  - 不实现具体的故障恢复逻辑（仅广播事件）
+  
+  **Recommended Agent Profile**:
+  - **Category**: unspecified-high
+  - **Skills**: []
+  
+  **Parallelization**:
+  - **Can Run In Parallel**: YES (与 Task 8 并行)
+  - **Parallel Group**: Wave 3
+  - **Blocks**: Task 10
+  - **Blocked By**: Task 5, Task 6, Task 7
+  
+  **References**:
+  - `control-plane/state-engine/src/failover.rs:72-80` - FailoverEvent 定义
+  
+  **Acceptance Criteria**:
+  - [ ] Worker 故障时触发事件
+  - [ ] 订阅者可以接收事件
+  
+  **QA Scenarios**:
+  - Tool: Bash (go test)
+  - Steps:
+    1. cd orchestration/scheduler
+    2. go test -v -run TestWorkerFailureEvent
+  - Expected Result: PASS
+  - Evidence: .sisyphus/evidence/task-9-event-test.txt
+  
+  **Commit**: YES
+  - Message: `feat(scheduler): add failure event broadcasting`
+  - Files: `orchestration/scheduler/main.go`
+
+---
+
+- [ ] **Task 10: 端到端测试和 Bug 修复**
+
+  **What to do**:
+  - 编写端到端集成测试
+  - 模拟 Worker 故障场景
+  - 验证任务自动重分配
+  - 修复发现的 Bug
+  
+  **Must NOT do**:
+  - 不添加新功能（仅测试和修复）
+  
+  **Recommended Agent Profile**:
+  - **Category**: unspecified-high
+  - **Skills**: ["dev-browser"]
+  
+  **Parallelization**:
+  - **Can Run In Parallel**: NO
+  - **Parallel Group**: Wave 3 (最后任务)
+  - **Blocks**: F1-F4
+  - **Blocked By**: Task 4, Task 7, Task 8, Task 9
+  
+  **Acceptance Criteria**:
+  - [ ] 端到端测试通过
+  - [ ] 所有已知 Bug 已修复
+  
+  **QA Scenarios**:
+  - Tool: Bash (go test)
+  - Steps:
+    1. cd orchestration
+    2. go test -v ./... -run TestE2E
+  - Expected Result: PASS
+  - Evidence: .sisyphus/evidence/task-10-e2e.txt
+  
+  **Commit**: YES (可能多个提交)
+  - Message: `test(orchestration): add end-to-end tests`
+  - Files: `orchestration/**/*_test.go`
+
+---
+
 ## Final Verification Wave
 
 ### F1: 单元测试覆盖检查
