@@ -36,6 +36,7 @@ func (l *LocalCache) SetWithTTL(key string, value interface{}, ttl time.Duration
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.cache.Set(key, value, 1)
+	l.cache.Wait() // Wait for the item to be processed
 	if ttl > 0 {
 		l.ttl[key] = time.Now().Add(ttl)
 	} else {
@@ -44,6 +45,7 @@ func (l *LocalCache) SetWithTTL(key string, value interface{}, ttl time.Duration
 }
 
 // Get retrieves a value if present and not expired.
+// Note: Metrics are recorded by the caller (CacheManager) to avoid double-counting.
 func (l *LocalCache) Get(key string) (interface{}, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -57,6 +59,14 @@ func (l *LocalCache) Get(key string) (interface{}, bool) {
 	}
 	val, ok := l.cache.Get(key)
 	return val, ok
+}
+
+// Delete removes a key from the cache and its TTL tracking.
+func (l *LocalCache) Delete(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.cache.Del(key)
+	delete(l.ttl, key)
 }
 
 // Close cleans up underlying resources.

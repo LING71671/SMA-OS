@@ -5,6 +5,7 @@ pub mod pool;
 pub mod limiter;
 pub mod failover;
 pub mod metrics;
+pub mod cache;
 
 pub use engine::StateEngine;
 pub use models::StateEvent;

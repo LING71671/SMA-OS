@@ -1,0 +1,467 @@
+// SMA-OS Identity Service Protocol Buffers
+//
+// This protocol defines the gRPC service for identity management across SMA-OS.
+// It supports identity lifecycle, credential management, privilege escalation,
+// delegation, and hierarchical relationships.
+//
+// Version: 1.0
+
+syntax = "proto3";
+
+package sma.identity;
+
+option go_package = "sma-os/sma-proto/identity";
+option csharp_namespace = "SMA.OS.Identity";
+option java_package = "com.smaos.identity";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+// IdentityType defines the category of an identity.
+enum IdentityType {
+    IDENTITY_TYPE_UNSPECIFIED = 0;
+    IDENTITY_TYPE_SYSTEM = 1;       // System-level identities
+    IDENTITY_TYPE_MANAGER = 2;      // Manager-level identities
+    IDENTITY_TYPE_WORKER = 3;       // Worker-level identities
+    IDENTITY_TYPE_SERVICE = 4;      // Service account identities
+    IDENTITY_TYPE_EPHEMERAL = 5;    // Short-lived identities
+}
+
+// ScopeLevel defines the granularity of access scope.
+enum ScopeLevel {
+    SCOPE_LEVEL_UNSPECIFIED = 0;
+    SCOPE_LEVEL_GLOBAL = 1;         // Global access
+    SCOPE_LEVEL_TENANT = 2;         // Tenant-scoped access
+    SCOPE_LEVEL_NAMESPACE = 3;      // Namespace-scoped access
+    SCOPE_LEVEL_RESOURCE = 4;       // Resource-scoped access
+}
+
+// IdentityStatus represents the current status of an identity.
+enum IdentityStatus {
+    IDENTITY_STATUS_UNSPECIFIED = 0;
+    IDENTITY_STATUS_ACTIVE = 1;       // Identity is active
+    IDENTITY_STATUS_SUSPENDED = 2;    // Identity is suspended
+    IDENTITY_STATUS_REVOKED = 3;      // Identity is revoked
+    IDENTITY_STATUS_EXPIRED = 4;       // Identity has expired
+}
+
+// AuditAction represents actions logged in the audit trail.
+enum AuditAction {
+    AUDIT_ACTION_UNSPECIFIED = 0;
+    AUDIT_ACTION_IDENTITY_CREATED = 1;
+    AUDIT_ACTION_IDENTITY_UPDATED = 2;
+    AUDIT_ACTION_IDENTITY_REVOKED = 3;
+    AUDIT_ACTION_IDENTITY_SUSPENDED = 4;
+    AUDIT_ACTION_IDENTITY_ACTIVATED = 5;
+    AUDIT_ACTION_CREDENTIAL_ISSUED = 6;
+    AUDIT_ACTION_CREDENTIAL_VALIDATED = 7;
+    AUDIT_ACTION_CREDENTIAL_REVOKED = 8;
+    AUDIT_ACTION_ESCALATION_GRANTED = 9;
+    AUDIT_ACTION_ESCALATION_REVOKED = 10;
+    AUDIT_ACTION_DELEGATION_GRANTED = 11;
+    AUDIT_ACTION_DELEGATION_REVOKED = 12;
+    AUDIT_ACTION_CHILD_CREATED = 13;
+    AUDIT_ACTION_CASCADE_REVOKE = 14;
+}
+
+// ============================================================================
+// Messages - Core Types
+// ============================================================================
+
+// Capability represents a permission that an identity can possess.
+message Capability {
+    string name = 1;                    // Capability name (e.g., "task.execute")
+    string category = 2;                // Category (e.g., "execute", "storage")
+    repeated string actions = 3;          // Allowed actions
+    string resource_pattern = 4;          // Optional resource pattern
+}
+
+// IdentityScope defines the scope of access for an identity.
+message IdentityScope {
+    ScopeLevel level = 1;               // Scope level
+    string tenant_id = 2;             // Tenant ID (if applicable)
+    string namespace = 3;               // Namespace (if applicable)
+    string resource_id = 4;            // Resource ID (if applicable)
+}
+
+// IdentityContext is the core identity structure.
+message IdentityContext {
+    string id = 1;                      // Unique identity ID
+    IdentityType type = 2;              // Identity type
+    string name = 3;                    // Human-readable name
+    IdentityScope scope = 4;            // Access scope
+    repeated Capability capabilities = 5; // Granted capabilities
+    map<string, string> claims = 6;     // Additional claims
+    uint32 security_level = 7;          // Security level (1-100)
+    string parent_id = 8;              // Parent identity ID
+    int32 generation = 9;              // Generation in hierarchy
+    google.protobuf.Timestamp created_at = 10;  // Creation timestamp
+    google.protobuf.Timestamp expires_at = 11;  // Expiration timestamp
+    IdentityStatus status = 12;         // Current status
+}
+
+// IdentityCredential represents an authentication credential.
+message IdentityCredential {
+    string identity_id = 1;             // Identity ID
+    string token = 2;                   // Authentication token
+    google.protobuf.Timestamp issued_at = 3;      // Issuance timestamp
+    google.protobuf.Timestamp expires_at = 4;   // Expiration timestamp
+    repeated string scopes = 5;         // Authorized scopes
+}
+
+// EscalationToken represents a temporary privilege escalation.
+message EscalationToken {
+    string token_id = 1;                // Unique token ID
+    string identity_id = 2;             // Identity ID
+    string capability = 3;              // Granted capability
+    google.protobuf.Timestamp granted_at = 4;   // Grant timestamp
+    google.protobuf.Timestamp expires_at = 5;   // Expiration timestamp
+    string reason = 6;                  // Reason for escalation
+}
+
+// DelegationToken represents a delegation from one identity to another.
+message DelegationToken {
+    string token_id = 1;                // Unique token ID
+    string delegator_id = 2;            // Delegator identity ID
+    string delegatee_id = 3;            // Delegatee identity ID
+    repeated string scopes = 4;         // Authorized scopes
+    google.protobuf.Timestamp granted_at = 5;     // Grant timestamp
+    google.protobuf.Timestamp expires_at = 6;   // Expiration timestamp
+}
+
+// IdentityFilter is used for querying identities.
+message IdentityFilter {
+    IdentityType identity_type = 1;     // Filter by type
+    string tenant_id = 2;               // Filter by tenant
+    string namespace = 3;               // Filter by namespace
+    IdentityStatus status = 4;          // Filter by status
+    string parent_id = 5;               // Filter by parent
+    uint32 min_security_level = 6;      // Minimum security level
+    uint32 max_security_level = 7;      // Maximum security level
+}
+
+// ============================================================================
+// Messages - Request/Response
+// ============================================================================
+
+// CreateIdentityRequest
+message CreateIdentityRequest {
+    IdentityType type = 1;              // Identity type
+    string name = 2;                    // Identity name
+    IdentityScope scope = 3;            // Access scope
+    string parent_id = 4;              // Optional parent ID
+}
+
+// CreateIdentityResponse
+message CreateIdentityResponse {
+    IdentityContext identity = 1;     // Created identity
+    string error = 2;                   // Error message (if failed)
+}
+
+// GetIdentityRequest
+message GetIdentityRequest {
+    string identity_id = 1;             // Identity ID
+}
+
+// GetIdentityResponse
+message GetIdentityResponse {
+    IdentityContext identity = 1;     // Retrieved identity
+    string error = 2;                   // Error message (if failed)
+}
+
+// UpdateIdentityRequest
+message UpdateIdentityRequest {
+    string identity_id = 1;             // Identity ID
+    IdentityContext identity = 2;     // Updated identity data
+}
+
+// UpdateIdentityResponse
+message UpdateIdentityResponse {
+    IdentityContext identity = 1;     // Updated identity
+    string error = 2;                   // Error message (if failed)
+}
+
+// DeleteIdentityRequest
+message DeleteIdentityRequest {
+    string identity_id = 1;             // Identity ID
+    string reason = 2;                // Reason for deletion
+}
+
+// DeleteIdentityResponse
+message DeleteIdentityResponse {
+    bool success = 1;                   // Whether deletion succeeded
+    string error = 2;                   // Error message (if failed)
+}
+
+// ListIdentitiesRequest
+message ListIdentitiesRequest {
+    IdentityFilter filter = 1;        // Filter criteria
+    int32 page_size = 2;              // Number of results per page
+    string page_token = 3;            // Pagination token
+}
+
+// ListIdentitiesResponse
+message ListIdentitiesResponse {
+    repeated IdentityContext identities = 1; // List of identities
+    string next_page_token = 2;         // Token for next page
+    int32 total_count = 3;            // Total number of identities
+}
+
+// IssueCredentialRequest
+message IssueCredentialRequest {
+    string identity_id = 1;             // Identity ID
+    repeated string scopes = 2;         // Authorized scopes
+    google.protobuf.Duration validity = 3;  // Validity duration
+}
+
+// IssueCredentialResponse
+message IssueCredentialResponse {
+    IdentityCredential credential = 1;  // Issued credential
+    string error = 2;                   // Error message (if failed)
+}
+
+// ValidateCredentialRequest
+message ValidateCredentialRequest {
+    string token = 1;                   // Credential token
+}
+
+// ValidateCredentialResponse
+message ValidateCredentialResponse {
+    bool valid = 1;                     // Whether credential is valid
+    string identity_id = 2;             // Identity ID (if valid)
+    repeated string scopes = 3;         // Authorized scopes
+    string error = 4;                   // Error message (if invalid)
+}
+
+// RevokeCredentialRequest
+message RevokeCredentialRequest {
+    string identity_id = 1;             // Identity ID
+}
+
+// RevokeCredentialResponse
+message RevokeCredentialResponse {
+    bool success = 1;                   // Whether revocation succeeded
+    string error = 2;                   // Error message (if failed)
+}
+
+// EscalateRequest
+message EscalateRequest {
+    string identity_id = 1;             // Identity ID
+    string capability = 2;              // Capability to escalate
+    string reason = 3;                // Reason for escalation
+    google.protobuf.Duration duration = 4;  // Escalation duration
+}
+
+// EscalateResponse
+message EscalateResponse {
+    EscalationToken token = 1;          // Escalation token
+    string error = 2;                   // Error message (if failed)
+}
+
+// DeEscalateRequest
+message DeEscalateRequest {
+    string token_id = 1;                // Escalation token ID
+}
+
+// DeEscalateResponse
+message DeEscalateResponse {
+    bool success = 1;                   // Whether de-escalation succeeded
+    string error = 2;                   // Error message (if failed)
+}
+
+// DelegateRequest
+message DelegateRequest {
+    string delegator_id = 1;            // Delegator identity ID
+    string delegatee_id = 2;            // Delegatee identity ID
+    repeated string scopes = 3;         // Delegated scopes
+    google.protobuf.Duration duration = 4;  // Delegation duration
+}
+
+// DelegateResponse
+message DelegateResponse {
+    DelegationToken token = 1;          // Delegation token
+    string error = 2;                   // Error message (if failed)
+}
+
+// RevokeDelegationRequest
+message RevokeDelegationRequest {
+    string token_id = 1;                // Delegation token ID
+}
+
+// RevokeDelegationResponse
+message RevokeDelegationResponse {
+    bool success = 1;                   // Whether revocation succeeded
+    string error = 2;                   // Error message (if failed)
+}
+
+// CreateChildRequest
+message CreateChildRequest {
+    string parent_id = 1;               // Parent identity ID
+    IdentityType child_type = 2;        // Child identity type
+    string child_name = 3;            // Child identity name
+}
+
+// CreateChildResponse
+message CreateChildResponse {
+    IdentityContext child = 1;        // Created child identity
+    string error = 2;                   // Error message (if failed)
+}
+
+// GetChildrenRequest
+message GetChildrenRequest {
+    string parent_id = 1;               // Parent identity ID
+}
+
+// GetChildrenResponse
+message GetChildrenResponse {
+    repeated IdentityContext children = 1; // List of children
+    int32 child_count = 2;            // Number of children
+}
+
+// CascadeRevokeRequest
+message CascadeRevokeRequest {
+    string identity_id = 1;             // Identity ID to revoke
+    string reason = 2;                // Reason for revocation
+}
+
+// CascadeRevokeResponse
+message CascadeRevokeResponse {
+    int32 revoked_count = 1;          // Number of identities revoked
+    repeated string revoked_identities = 2; // List of revoked IDs
+}
+
+// ============================================================================
+// Messages - Audit
+// ============================================================================
+
+// AuditEvent represents an entry in the audit log.
+message AuditEvent {
+    string event_id = 1;                // Unique event ID
+    google.protobuf.Timestamp timestamp = 2;  // Event timestamp
+    string identity_id = 3;             // Identity ID
+    string identity_type = 4;           // Identity type
+    AuditAction action = 5;             // Action performed
+    string target_id = 6;             // Target ID (if applicable)
+    string target_type = 7;           // Target type
+    bool success = 8;                   // Whether action succeeded
+    string error_message = 9;         // Error message (if failed)
+    string ip_address = 10;             // IP address
+    string user_agent = 11;             // User agent
+    string request_id = 12;             // Request ID
+    map<string, string> metadata = 13;  // Additional metadata
+}
+
+// AuditLogRequest
+message AuditLogRequest {
+    string identity_id = 1;             // Filter by identity
+    AuditAction action = 2;             // Filter by action
+    google.protobuf.Timestamp start_time = 3;   // Start time range
+    google.protobuf.Timestamp end_time = 4;     // End time range
+    int32 page_size = 5;              // Number of results per page
+    string page_token = 6;            // Pagination token
+}
+
+// AuditLogResponse
+message AuditLogResponse {
+    repeated AuditEvent events = 1;     // List of audit events
+    string next_page_token = 2;         // Token for next page
+    int32 total_count = 3;            // Total number of events
+}
+
+// ============================================================================
+// Service Definition
+// ============================================================================
+
+// IdentityService provides identity management capabilities.
+service IdentityService {
+    // Identity Lifecycle Management
+    
+    // CreateIdentity creates a new identity.
+    rpc CreateIdentity(CreateIdentityRequest) returns (CreateIdentityResponse);
+    
+    // GetIdentity retrieves an identity by ID.
+    rpc GetIdentity(GetIdentityRequest) returns (GetIdentityResponse);
+    
+    // UpdateIdentity updates an existing identity.
+    rpc UpdateIdentity(UpdateIdentityRequest) returns (UpdateIdentityResponse);
+    
+    // DeleteIdentity revokes an identity.
+    rpc DeleteIdentity(DeleteIdentityRequest) returns (DeleteIdentityResponse);
+    
+    // ListIdentities lists identities matching the filter.
+    rpc ListIdentities(ListIdentitiesRequest) returns (ListIdentitiesResponse);
+    
+    // Credential Management
+    
+    // IssueCredential issues a new credential.
+    rpc IssueCredential(IssueCredentialRequest) returns (IssueCredentialResponse);
+    
+    // ValidateCredential validates a credential token.
+    rpc ValidateCredential(ValidateCredentialRequest) returns (ValidateCredentialResponse);
+    
+    // RevokeCredential revokes all credentials for an identity.
+    rpc RevokeCredential(RevokeCredentialRequest) returns (RevokeCredentialResponse);
+    
+    // Privilege Escalation
+    
+    // Escalate grants a temporary privilege escalation.
+    rpc Escalate(EscalateRequest) returns (EscalateResponse);
+    
+    // DeEscalate revokes an escalation token.
+    rpc DeEscalate(DeEscalateRequest) returns (DeEscalateResponse);
+    
+    // Delegation
+    
+    // Delegate creates a delegation from one identity to another.
+    rpc Delegate(DelegateRequest) returns (DelegateResponse);
+    
+    // RevokeDelegation revokes a delegation token.
+    rpc RevokeDelegation(RevokeDelegationRequest) returns (RevokeDelegationResponse);
+    
+    // Hierarchy Management
+    
+    // CreateChild creates a child identity.
+    rpc CreateChild(CreateChildRequest) returns (CreateChildResponse);
+    
+    // GetChildren retrieves child identities.
+    rpc GetChildren(GetChildrenRequest) returns (GetChildrenResponse);
+    
+    // CascadeRevoke revokes an identity and all its descendants.
+    rpc CascadeRevoke(CascadeRevokeRequest) returns (CascadeRevokeResponse);
+    
+    // Audit
+    
+    // AuditLog retrieves audit events.
+    rpc AuditLog(AuditLogRequest) returns (AuditLogResponse);
+}
+
+// ============================================================================
+// Event Stream
+// ============================================================================
+
+// IdentityEvent is used for real-time identity event streaming.
+message IdentityEvent {
+    string event_id = 1;                // Unique event ID
+    google.protobuf.Timestamp timestamp = 2;  // Event timestamp
+    AuditAction action = 3;             // Action type
+    IdentityContext identity = 4;     // Affected identity
+    string reason = 5;                // Reason for the event
+}
+
+// SubscribeIdentityEventsRequest
+message SubscribeIdentityEventsRequest {
+    repeated AuditAction actions = 1;     // Filter by actions (empty = all)
+    string tenant_id = 2;               // Filter by tenant
+}
+
+// IdentityEventStream is a bidirectional streaming service for real-time updates.
+service IdentityEventService {
+    // SubscribeIdentityEvents subscribes to identity events.
+    rpc SubscribeIdentityEvents(SubscribeIdentityEventsRequest) 
+        returns (stream IdentityEvent);
+}

@@ -1,8 +1,9 @@
 [workspace]
 members = [
-  "state-engine",
-  "fractal-gateway",
-  "fractal-gateway-ebpf",
-  "teardown-ctrl"
+    "state-engine",
+    "fractal-gateway",
+    "fractal-gateway-ebpf",
+    "teardown-ctrl",
+    "identity"
 ]
 resolver = "2"
