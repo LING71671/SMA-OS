@@ -2,9 +2,13 @@ use crate::models::{Snapshot, StateEvent};
 use redis::AsyncCommands;
 use sqlx::Row;
 use thiserror::Error;
+use std::time::Duration;
 
 /// Cache TTL in seconds (24 hours)
 const REDIS_CACHE_TTL_SECS: usize = 86400;
+
+/// Redis connection timeout in seconds
+const REDIS_CONNECTION_TIMEOUT_SECS: u64 = 5;
 
 #[derive(Error, Debug)]
 pub enum EngineError {
@@ -16,6 +20,8 @@ pub enum EngineError {
     Serialization(#[from] serde_json::Error),
     #[error("Database migration error: {0}")]
     Migration(String),
+    #[error("Connection timeout")]
+    ConnectionTimeout,
 }
 
 /// Durable State Engine
@@ -38,14 +44,22 @@ impl StateEngine {
             .await
             .map_err(|e| EngineError::Migration(e.to_string()))?;
 
-        Ok(Self {
-            redis_client,
-            pg_pool,
-        })
+        Ok(Self { redis_client, pg_pool })
+    }
+
+    /// Get Redis connection with timeout protection
+    async fn get_redis_connection(&self) -> Result<redis::aio::Connection, EngineError> {
+        tokio::time::timeout(
+            Duration::from_secs(REDIS_CONNECTION_TIMEOUT_SECS),
+            self.redis_client.get_async_connection(),
+        )
+        .await
+        .map_err(|_| EngineError::ConnectionTimeout)?
+        .map_err(EngineError::Redis)
     }
 
     pub async fn append_event(&self, event: StateEvent) -> Result<(), EngineError> {
-        let mut conn = self.redis_client.get_async_connection().await?;
+        let mut conn = self.get_redis_connection().await?;
         let event_json = serde_json::to_string(&event)?;
         let redis_key = format!("events:{}:{}", event.tenant_id, event.namespace);
         let _: () = conn
@@ -91,9 +105,37 @@ impl StateEngine {
             namespace,
             current_version
         );
-        let snapshot_id = uuid::Uuid::new_v4();
-        let state_blob = serde_json::json!({"status": "compressed_state: placeholder"});
 
+        let start_version = current_version.saturating_sub(1000);
+
+        // 从 PostgreSQL 查询快照范围内的所有事件，聚合为真实状态快照
+        let sql = r#"
+SELECT payload FROM hot_events
+WHERE tenant_id = $1 AND namespace = $2 AND version >= $3 AND version <= $4
+ORDER BY version ASC
+"#;
+        let rows = sqlx::query(sql)
+            .bind(&tenant_id)
+            .bind(&namespace)
+            .bind(start_version as i64)
+            .bind(current_version as i64)
+            .fetch_all(&self.pg_pool)
+            .await?;
+
+        let payloads: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|row| row.get::<serde_json::Value, _>("payload"))
+            .collect();
+
+        let state_blob = serde_json::json!({
+            "snapshot_type": "event_aggregate",
+            "event_count": payloads.len(),
+            "start_version": start_version,
+            "end_version": current_version,
+            "events": payloads,
+        });
+
+        let snapshot_id = uuid::Uuid::new_v4();
         sqlx::query(
             r#"
             INSERT INTO snapshots (snapshot_id, tenant_id, namespace, start_version, end_version, state_blob, created_at)
@@ -104,7 +146,7 @@ impl StateEngine {
         .bind(snapshot_id)
         .bind(tenant_id)
         .bind(namespace)
-        .bind(current_version.saturating_sub(1000) as i64)
+        .bind(start_version as i64)
         .bind(current_version as i64)
         .bind(state_blob)
         .bind(chrono::Utc::now().timestamp())
@@ -112,7 +154,7 @@ impl StateEngine {
         .await?;
 
         Ok(())
-}
+    }
 
     // ============================================================
     // Query Interfaces - Task 1.1
@@ -128,14 +170,14 @@ impl StateEngine {
     ///
     /// # Returns
     /// Events sorted by version ascending
-    pub async fn get_events(
-        &self,
-        tenant_id: &str,
-        namespace: &str,
-        from_version: u64,
-        to_version: Option<u64>,
-    ) -> Result<Vec<StateEvent>, EngineError> {
-        let mut conn = self.redis_client.get_async_connection().await?;
+pub async fn get_events(
+    &self,
+    tenant_id: &str,
+    namespace: &str,
+    from_version: u64,
+    to_version: Option<u64>,
+) -> Result<Vec<StateEvent>, EngineError> {
+    let mut conn = self.get_redis_connection().await?;
         let redis_key = format!("events:{}:{}", tenant_id, namespace);
 
         // Use Redis-specific infinity representation
@@ -144,11 +186,22 @@ impl StateEngine {
             .map(|v| v.to_string())
             .unwrap_or_else(|| "+inf".to_string());
 
-        // Try Redis first
-        let event_strings: Vec<String> = conn
+        // Try Redis first with error logging
+        let event_strings: Vec<String> = match conn
             .zrangebyscore(&redis_key, &min_score, &max_score)
             .await
-            .unwrap_or_default();
+        {
+            Ok(strings) => strings,
+            Err(e) => {
+                tracing::warn!(
+                    "Redis query failed for {}/{}, falling back to PostgreSQL: {}",
+                    tenant_id,
+                    namespace,
+                    e
+                );
+                Vec::new()
+            }
+        };
 
         if !event_strings.is_empty() {
             // Parse events from Redis, skip corrupted entries
@@ -281,7 +334,7 @@ LIMIT 1
         namespace: &str,
         version: u64,
     ) -> Result<Option<StateEvent>, EngineError> {
-        let mut conn = self.redis_client.get_async_connection().await?;
+        let mut conn = self.get_redis_connection().await?;
         let redis_key = format!("events:{}:{}", tenant_id, namespace);
 
         // Try Redis first

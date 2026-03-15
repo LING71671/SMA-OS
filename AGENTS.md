@@ -28,6 +28,12 @@ This root AGENTS.md covers project-wide conventions. Module-specific guides:
 - [`execution-layer/sandbox-daemon/AGENTS.md`](execution-layer/sandbox-daemon/AGENTS.md) - Firecracker MicroVM lifecycle
 - [`execution-layer/stateful-repl/AGENTS.md`](execution-layer/stateful-repl/AGENTS.md) - Persistent terminal sessions
 
+### Plugins (Rust) 🆕
+- [`plugins/AGENTS.md`](plugins/AGENTS.md) - Plugin architecture (core + marketplace)
+
+### Security Audit (Rust) 🆕
+- [`security-audit/AGENTS.md`](security-audit/AGENTS.md) - Automated security scanning
+
 ### Observability (TypeScript)
 - [`observability-ui/web-dashboard/AGENTS.md`](observability-ui/web-dashboard/AGENTS.md) - Next.js observability UI
 
@@ -362,6 +368,8 @@ npm run dev --prefix observability-ui/web-dashboard
 | `chaos-tests` | Chaos engineering framework | Rust | High |
 | `benchmarks` | Performance benchmarking suite | Rust/Go | Medium |
 | `sma-proto` | gRPC Protocol definitions | Protobuf | Low |
+| `plugins` | Plugin architecture and marketplace | Rust | Medium |
+| `security-audit` | Automated security scanning | Rust | Low |
 
 ## Final Goals
 

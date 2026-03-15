@@ -55,12 +55,14 @@ type TaskNode struct {
 	Dependencies []string
 	Status       TaskStatus
 	Payload      string
+	Scheduled    bool // Prevents duplicate enqueuing when multiple dependencies complete
 }
 
 // Orchestrator Manager responsible for Topological Execution
 type DAGManager struct {
 	Nodes         map[string]*TaskNode
 	inDegree      map[string]int
+	dependents    map[string][]string // Adjacency list: taskID -> list of dependent task IDs
 	mu            sync.Mutex
 	FailureConfig FailureConfig
 }
@@ -69,16 +71,22 @@ func NewDAGManager(config FailureConfig) *DAGManager {
 	return &DAGManager{
 		Nodes:         make(map[string]*TaskNode),
 		inDegree:      make(map[string]int),
+		dependents:    make(map[string][]string),
 		FailureConfig: config,
 	}
 }
 
-// AddTask computes indegrees dynamically
+// AddTask computes indegrees dynamically and builds adjacency list
 func (dm *DAGManager) AddTask(t TaskNode) {
 	dm.mu.Lock()
 	defer dm.mu.Unlock()
 	dm.Nodes[t.ID] = &t
 	dm.inDegree[t.ID] = len(t.Dependencies)
+
+	// Build adjacency list for O(1) dependent lookup
+	for _, dep := range t.Dependencies {
+		dm.dependents[dep] = append(dm.dependents[dep], t.ID)
+	}
 
 	// Ensure dependencies exist in the graph (simplified)
 	for _, dep := range t.Dependencies {
@@ -89,13 +97,20 @@ func (dm *DAGManager) AddTask(t TaskNode) {
 }
 
 // Execute performs topologically sorted concurrent worker dispatching
+// with failure propagation: if a task fails, all its dependents are also marked Failed.
 func (dm *DAGManager) Execute() error {
+	totalTasks := len(dm.Nodes)
+	if totalTasks == 0 {
+		log.Println("[Manager] Empty DAG, nothing to execute.")
+		return nil
+	}
+
 	log.Println("[Manager] Starting Topologically Sorted DAG Execution...")
 
-	readyQueue := make(chan *TaskNode, len(dm.Nodes))
-	completionChan := make(chan *TaskResult, len(dm.Nodes))
-	dispatcherDone := make(chan struct{})
+	readyQueue := make(chan *TaskNode, totalTasks)
+	completionChan := make(chan *TaskResult, totalTasks)
 	var wg sync.WaitGroup
+	var completedTasks int32 = 0
 
 	// 1. Enqueue all initial nodes with 0 in-degree
 	dm.mu.Lock()
@@ -106,38 +121,43 @@ func (dm *DAGManager) Execute() error {
 	}
 	dm.mu.Unlock()
 
-	totalTasks := len(dm.Nodes)
-	var completedTasks int32 = 0
+	// 全局超时防护，避免任何情况下的永久阻塞
+	globalTimeout := time.Duration(totalTasks) * (dm.FailureConfig.Timeout + dm.FailureConfig.RetryDelay*time.Duration(dm.FailureConfig.MaxRetries+1))
+	if globalTimeout < 30*time.Second {
+		globalTimeout = 30 * time.Second
+	}
+	timer := time.NewTimer(globalTimeout)
+	defer timer.Stop()
 
 	// 2. Dispatch loop
+	dispatcherDone := make(chan error, 1)
 	go func() {
-		defer close(dispatcherDone)
 		for {
 			select {
 			case task := <-readyQueue:
 				wg.Add(1)
-				// Simulating Worker assignment (e.g. gRPC to Firecracker MicroVM pool)
 				go dm.dispatchWorker(task, completionChan, &wg)
 
 			case res := <-completionChan:
 				atomic.AddInt32(&completedTasks, 1)
-				log.Printf("[Manager] Registered COMPLETION event for Task: %s", res.TaskID)
+				log.Printf("[Manager] Registered %s event for Task: %s", res.Status, res.TaskID)
 
-				// Calculate dependents and decrement their in-degrees
 				dm.mu.Lock()
-				for id, node := range dm.Nodes {
-					if node.Status == Pending {
-						// Check if completedID is in dependencies
-						hasDep := false
-						for _, d := range node.Dependencies {
-							if d == res.TaskID {
-								hasDep = true
-								break
-							}
-						}
-						if hasDep {
-							dm.inDegree[id]--
-							if dm.inDegree[id] == 0 {
+				if res.Status == Failed && dm.FailureConfig.CancelOnParentFail {
+					// 失败传播：递归取消所有下游依赖任务
+					cancelled := dm.cancelDependents(res.TaskID)
+					atomic.AddInt32(&completedTasks, int32(cancelled))
+				}
+
+				if res.Status == Completed {
+					// Use adjacency list for O(1) dependent lookup
+					dependents := dm.dependents[res.TaskID]
+					for _, depID := range dependents {
+						node := dm.Nodes[depID]
+						if node != nil && node.Status == Pending && !node.Scheduled {
+							dm.inDegree[depID]--
+							if dm.inDegree[depID] == 0 {
+								node.Scheduled = true // Mark as scheduled before enqueue
 								readyQueue <- node
 							}
 						}
@@ -145,19 +165,43 @@ func (dm *DAGManager) Execute() error {
 				}
 				dm.mu.Unlock()
 
-				if int(atomic.LoadInt32(&completedTasks)) == totalTasks {
-					log.Println("[Manager] All tasks in DAG completed successfully!")
-					return // End execution mapping
+				if int(atomic.LoadInt32(&completedTasks)) >= totalTasks {
+					log.Println("[Manager] All tasks in DAG resolved (completed or failed).")
+					dispatcherDone <- nil
+					return
 				}
+
+			case <-timer.C:
+				dispatcherDone <- fmt.Errorf("DAG execution timed out after %v", globalTimeout)
+				return
 			}
 		}
 	}()
 
-	// Wait for dispatcher to finish (all tasks completed)
-	<-dispatcherDone
-	// Wait for all actual worker routines to finish
+	// Wait for dispatcher to finish
+	err := <-dispatcherDone
 	wg.Wait()
-	return nil
+	return err
+}
+
+// cancelDependents recursively cancels all tasks that depend on failedTaskID
+// Must be called while holding dm.mu lock
+func (dm *DAGManager) cancelDependents(failedTaskID string) int {
+	cancelled := 0
+	// Use adjacency list for O(1) lookup
+	dependents := dm.dependents[failedTaskID]
+	for _, depID := range dependents {
+		node := dm.Nodes[depID]
+		if node == nil || node.Status != Pending {
+			continue
+		}
+		node.Status = Failed
+		cancelled++
+		log.Printf("[Manager] Task %s cancelled: parent %s failed", depID, failedTaskID)
+		// Recursively cancel dependents of this node
+		cancelled += dm.cancelDependents(depID)
+	}
+	return cancelled
 }
 
 func (dm *DAGManager) dispatchWorker(task *TaskNode, done chan<- *TaskResult, wg *sync.WaitGroup) {
@@ -170,10 +214,18 @@ func (dm *DAGManager) dispatchWorker(task *TaskNode, done chan<- *TaskResult, wg
 	// Retry loop
 	for attempt := 0; attempt <= dm.FailureConfig.MaxRetries; attempt++ {
 		if attempt > 0 {
-			// Calculate backoff delay
-			delay := time.Duration(float64(dm.FailureConfig.RetryDelay) * math.Pow(2, float64(attempt-1)))
-			if delay > 5*time.Second {
-				delay = 5 * time.Second // Cap at 5s
+			// Calculate backoff delay with overflow protection
+			exponent := float64(attempt - 1)
+			// Cap exponent to prevent overflow: max exponent where 2^n doesn't overflow float64
+			const maxExponent = 60
+			if exponent > maxExponent {
+				exponent = maxExponent
+			}
+			delay := time.Duration(float64(dm.FailureConfig.RetryDelay) * math.Pow(2, exponent))
+			// Cap at reasonable maximum
+			const maxDelay = 5 * time.Second
+			if delay > maxDelay {
+				delay = maxDelay
 			}
 			log.Printf("[Worker] Task %s retry %d/%d after %v", task.ID, attempt, dm.FailureConfig.MaxRetries, delay)
 			time.Sleep(delay)

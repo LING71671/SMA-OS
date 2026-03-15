@@ -19,8 +19,15 @@ chrono = "0.4"
 dashmap = "5.5"
 arc-swap = "1.7"
 governor = "0.2"
-deadpool = "0.10"
 async-trait = "0.1"
 prometheus = "0.13"
 hyper = { version = "0.14", features = ["full"] }
 moka = { version = "0.12", features = ["future"] }
+
+# Phase 4: gRPC service
+tonic = "0.12"
+prost = "0.13"
+
+[build-dependencies]
+tonic-build = "0.12"
+

@@ -1,0 +1,7 @@
+- [x] Checkpoint 1: 硬编码密码问题已在 CODE_REVIEW_ISSUES.md 中记录
+- [x] Checkpoint 2: payload 反序列化安全问题已在文档中记录
+- [x] Checkpoint 3: 所有新问题都有明确的优先级标记
+- [x] Checkpoint 4: 每个问题都有具体的修复建议和代码示例
+- [x] Checkpoint 5: 文档结构与原有的保持一致
+- [x] Checkpoint 6: 摘要统计表格已更新
+- [x] Checkpoint 7: 推荐行动章节已更新，新问题在高优先级列表

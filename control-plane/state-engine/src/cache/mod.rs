@@ -4,5 +4,4 @@
 //! to reduce latency for frequently accessed data.
 
 pub mod local;
-
 pub use local::LocalCache;

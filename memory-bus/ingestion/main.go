@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -60,7 +61,7 @@ func invokeLLM(prompt string) (string, error) {
 		Model: "deepseek-chat", // standard DeepSeek V3 chat model
 		Messages: []DeepSeekMessage{
 			{
-				Role: "system",
+				Role:    "system",
 				Content: `You are the SMA-OS Intent Extractor. Extract the user's command into EXACTLY this JSON format, NO markdown formatting: {"action": "string", "target": "string", "parameters": "string"}. E.g for "create vm pool A cpu=2", return {"action": "create_vm", "target": "pool-A", "parameters": "cpu=2"}`,
 			},
 			{
@@ -133,11 +134,24 @@ func fallbackRegexExtractor(prompt string) (*ParsedIntent, error) {
 func ProcessInput(userInput string, cacheManager *cache.CacheManager) (*ParsedIntent, error) {
 	log.Printf("\n--- Processing User Input: %s ---", userInput)
 
-	// Check if caching is enabled
+	// LLM 调用封装：统一入口，避免重复调用
+	callLLMAndParse := func() (*ParsedIntent, error) {
+		llmResponse, err := invokeLLM(userInput)
+		if err != nil {
+			return nil, err
+		}
+		var intent ParsedIntent
+		if err := json.Unmarshal([]byte(llmResponse), &intent); err != nil {
+			return nil, fmt.Errorf("LLM response unmarshal failed: %w", err)
+		}
+		intent.Source = "LLM"
+		intent.Confidence = 0.85
+		return &intent, nil
+	}
+
+	// 1. 如果缓存启用，通过缓存管理器调用 LLM（自带 singleflight 去重）
 	if cacheManager != nil {
-		// Try to get from cache
 		cachedResponse, err := cacheManager.Get(context.Background(), userInput, func(ctx context.Context) (string, error) {
-			// This is the loader function - only called on cache miss
 			return invokeLLM(userInput)
 		})
 
@@ -146,29 +160,25 @@ func ProcessInput(userInput string, cacheManager *cache.CacheManager) (*ParsedIn
 			if err := json.Unmarshal([]byte(cachedResponse), &intent); err == nil {
 				intent.Source = "LLM"
 				intent.Confidence = 0.85
-				log.Println("[Ingestion] Cache hit - LLM response retrieved from cache.")
+				log.Println("[Ingestion] LLM response retrieved (cached or fresh).")
 				return &intent, nil
 			}
 			log.Printf("[Warning] Failed to unmarshal cached response: %v", err)
 		} else {
-			// Log cache errors but continue with direct LLM call
-			log.Printf("[Warning] Cache error: %v. Falling back to direct LLM call.", err)
+			// 缓存内部的 loader (invokeLLM) 已经失败，不再重复调用，直接进入 fallback
+			log.Printf("[Warning] Cache/LLM error: %v. Skipping duplicate LLM call, falling back to regex.", err)
 		}
-	}
-
-	// 1. Attempt LLM JSON Extraction (direct call if cache miss or disabled)
-	llmResponse, err := invokeLLM(userInput)
-	if err == nil {
-		var intent ParsedIntent
-		if err := json.Unmarshal([]byte(llmResponse), &intent); err == nil {
-			intent.Source = "LLM"
-			intent.Confidence = 0.85
+	} else {
+		// 2. 缓存未启用时，直接调用 LLM
+		intent, err := callLLMAndParse()
+		if err == nil {
 			log.Println("[Ingestion] LLM successfully extracted intent.")
-			return &intent, nil
+			return intent, nil
 		}
+		log.Printf("[Warning] LLM failed: %v. Falling back to regex.", err)
 	}
 
-	// 2. Fallback to Regex / AST Parsing if LLM fails, hallucinates, or times out
+	// 3. Fallback: Regex 提取（LLM 失败/缓存失败后的最终手段）
 	intent, fallbackErr := fallbackRegexExtractor(userInput)
 	if fallbackErr == nil {
 		return intent, nil

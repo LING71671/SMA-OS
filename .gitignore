@@ -41,3 +41,20 @@ yarn-error.log*
 # Logs
 logs/
 *.log
+
+# Sisyphus task runner artifacts
+.sisyphus/evidence/
+.sisyphus/plans/
+.sisyphusdrafts/
+.sisyphusplans/
+
+# Debug/temporary files
+compile_err.txt
+check_error.log
+FIXES_APPLIED.md
+TASK_*_COMPLETE.md
+.review-fixes/
+
+# Broken path artifacts (tool-generated)
+ASMA-OS*
+

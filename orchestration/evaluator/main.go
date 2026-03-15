@@ -27,19 +27,34 @@ func NewEvaluatorAgent() *EvaluatorAgent {
 }
 
 func (e *EvaluatorAgent) AuditTaskResult(taskID string, version uint64, result string) *VersionedReject {
-	// Simulated check: assume we found a hallucination or incorrect output format
-	// In reality this would invoke LLM critic layers or rule-validators
-	if result == "invalid_schema" {
-		log.Printf("[Critic] Rejecting Task %s at Version %d due to schema mismatch.", taskID, version)
-		return &VersionedReject{
-			TaskID:          taskID,
-			RejectedVersion: version,
-			Reason:          "schema_mismatch",
-			RollbackTo:      version - 1,
-		}
+	// 规则驱动的验证：根据结果内容判断是否需要回滚
+	var reason string
+	switch {
+	case result == "invalid_schema":
+		reason = "schema_mismatch"
+	case result == "":
+		reason = "empty_result"
+	case result == "empty_action":
+		reason = "missing_action_field"
+	default:
+		log.Printf("[Critic] Task %s Version %d alignment OK.", taskID, version)
+		return nil
 	}
-	log.Printf("[Critic] Task %s Version %d alignment OK.", taskID, version)
-	return nil
+
+	log.Printf("[Critic] Rejecting Task %s at Version %d: %s", taskID, version, reason)
+
+	// 防止 uint64 下溢：version 为 0 时不能减 1
+	rollbackVersion := uint64(0)
+	if version > 0 {
+		rollbackVersion = version - 1
+	}
+
+	return &VersionedReject{
+		TaskID:          taskID,
+		RejectedVersion: version,
+		Reason:          reason,
+		RollbackTo:      rollbackVersion,
+	}
 }
 
 func main() {

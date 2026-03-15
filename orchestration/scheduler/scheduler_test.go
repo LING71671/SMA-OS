@@ -17,8 +17,9 @@ func TestSchedulerInitialization(t *testing.T) {
 		t.Errorf("Expected WarmPoolSize 10, got %d", scheduler.WarmPoolSize)
 	}
 
-	if len(scheduler.Workers) != 0 {
-		t.Errorf("Expected 0 workers initially, got %d", len(scheduler.Workers))
+	// initWarmPool 会在 NewScheduler 中创建 WarmPoolSize 个 worker
+	if len(scheduler.Workers) != 10 {
+		t.Errorf("Expected 10 workers after warm pool init, got %d", len(scheduler.Workers))
 	}
 }
 

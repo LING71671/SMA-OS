@@ -31,9 +31,11 @@ const (
 
 // WorkerHealth tracks health metrics
 type WorkerHealth struct {
-	Status        WorkerHealthStatus
-	LastHeartbeat time.Time
-	FailureCount  int
+	Status            WorkerHealthStatus
+	LastHeartbeat     time.Time
+	FailureCount      int
+	RecoveryStartedAt time.Time // When recovery began (for cooldown)
+	ConsecutiveGood   int       // Count of consecutive good heartbeats
 }
 
 // HeartbeatMessage represents a heartbeat message from a worker
@@ -52,17 +54,21 @@ type WorkerFailureEvent struct {
 
 // WorkerHealthConfig defines health check configuration
 type WorkerHealthConfig struct {
-	HeartbeatInterval    time.Duration
-	HealthCheckThreshold int
-	FailureThreshold     int
+	HeartbeatInterval     time.Duration
+	HealthCheckThreshold  int
+	FailureThreshold      int
+	RecoveryCooldown      time.Duration // Minimum time before marking healthy
+	ConsecutiveHeartbeats int           // Required good heartbeats for recovery
 }
 
 // DefaultWorkerHealthConfig returns default configuration
 func DefaultWorkerHealthConfig() WorkerHealthConfig {
 	return WorkerHealthConfig{
-		HeartbeatInterval:    10 * time.Second,
-		HealthCheckThreshold: 3,
-		FailureThreshold:     3,
+		HeartbeatInterval:     10 * time.Second,
+		HealthCheckThreshold:  3,
+		FailureThreshold:      3,
+		RecoveryCooldown:      30 * time.Second,
+		ConsecutiveHeartbeats: 3,
 	}
 }
 
@@ -148,7 +154,7 @@ func (s *FractalClusterScheduler) AssignTask(taskID string, previousHost string)
 
 	// 3. Fallback to Transient Worker (no healthy workers available)
 	assignedHost := "host-alpha-x1" // mock
-	assignedID := "microvm-pool-" + string(rune(rand.Intn(100)))
+	assignedID := fmt.Sprintf("microvm-pool-%d", rand.Intn(100))
 	log.Printf("[Scheduler] Transient Fallback: Task %s waking transient worker %s on %s (<5ms). No healthy workers available.", taskID, assignedID, assignedHost)
 	return assignedID
 }
@@ -183,7 +189,7 @@ func (s *FractalClusterScheduler) ReassignTaskFromUnhealthy(workerID string, tas
 
 	// No healthy workers available - return transient fallback
 	assignedHost := "host-alpha-x1" // mock
-	assignedID := "microvm-pool-" + string(rune(rand.Intn(100)))
+	assignedID := fmt.Sprintf("microvm-pool-%d", rand.Intn(100))
 	log.Printf("[Scheduler] Reassignment Fallback: Task %s moved from unhealthy Worker %s to transient worker %s on %s (<5ms). No healthy workers available.",
 		taskID, workerID, assignedID, assignedHost)
 	return assignedID, nil
@@ -359,17 +365,39 @@ func (s *FractalClusterScheduler) ReceiveHeartbeat(msg HeartbeatMessage) error {
 	// Update heartbeat time
 	worker.Health.LastHeartbeat = msg.Timestamp
 
-	// Reset failure count on successful heartbeat
-	if worker.Health.FailureCount > 0 {
-		worker.Health.FailureCount = 0
-		log.Printf("[Scheduler] Worker %s failure count reset after heartbeat", msg.WorkerID)
-	}
-
-	// If worker was unhealthy but sent heartbeat, mark as healthy
+	// Handle unhealthy worker recovery with cooldown and consecutive heartbeat check
 	if worker.Health.Status == WorkerUnhealthy {
-		worker.Health.Status = WorkerHealthy
-		worker.Available = true
-		log.Printf("[Scheduler] Worker %s recovered and marked HEALTHY", msg.WorkerID)
+		// Start recovery timer if not already started
+		if worker.Health.RecoveryStartedAt.IsZero() {
+			worker.Health.RecoveryStartedAt = msg.Timestamp
+			worker.Health.ConsecutiveGood = 0
+			log.Printf("[Scheduler] Worker %s started recovery period", msg.WorkerID)
+		}
+
+		// Increment consecutive good heartbeats
+		worker.Health.ConsecutiveGood++
+
+		// Check if recovery conditions are met
+		recoveryDuration := msg.Timestamp.Sub(worker.Health.RecoveryStartedAt)
+		if recoveryDuration >= s.HealthConfig.RecoveryCooldown &&
+			worker.Health.ConsecutiveGood >= s.HealthConfig.ConsecutiveHeartbeats {
+			worker.Health.Status = WorkerHealthy
+			worker.Health.FailureCount = 0
+			worker.Health.ConsecutiveGood = 0
+			worker.Health.RecoveryStartedAt = time.Time{} // Reset
+			worker.Available = true
+			log.Printf("[Scheduler] Worker %s recovered after %v and %d good heartbeats",
+				msg.WorkerID, recoveryDuration, s.HealthConfig.ConsecutiveHeartbeats)
+		} else {
+			log.Printf("[Scheduler] Worker %s recovery in progress: %v elapsed, %d/%d good heartbeats",
+				msg.WorkerID, recoveryDuration, worker.Health.ConsecutiveGood, s.HealthConfig.ConsecutiveHeartbeats)
+		}
+	} else {
+		// Healthy worker: reset failure count on successful heartbeat
+		if worker.Health.FailureCount > 0 {
+			worker.Health.FailureCount = 0
+			log.Printf("[Scheduler] Worker %s failure count reset after heartbeat", msg.WorkerID)
+		}
 	}
 
 	log.Printf("[Scheduler] Heartbeat received from worker %s", msg.WorkerID)

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
@@ -9,9 +7,9 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: sma
-      POSTGRES_PASSWORD: sma
-      POSTGRES_DB: sma_state
+      POSTGRES_USER: ${POSTGRES_USER:-sma}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-sma_state}
     ports:
       - "5432:5432"
 
@@ -21,13 +19,13 @@ services:
       - "8123:8123"
       - "9000:9000"
     environment:
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: sma
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD must be set}
 
   weaviate:
     image: semitechnologies/weaviate:latest
     ports:
-      - "8080:8080"
+      - "8088:8080"
     environment:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'

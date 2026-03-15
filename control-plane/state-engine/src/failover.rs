@@ -60,7 +60,7 @@ impl Default for FailoverConfig {
 pub struct FailoverManager {
     config: FailoverConfig,
     /// Component health status
-    health_status: Arc<RwLock<HashMap<String, HealthStatus>>>,
+    pub health_status: Arc<RwLock<HashMap<String, HealthStatus>>>,
     /// Failure counters per component
     failure_counts: Arc<RwLock<HashMap<String, u32>>>,
     /// Last health check time
@@ -112,45 +112,59 @@ impl FailoverManager {
 
     /// Update health status
     pub async fn update_health(&self, check: HealthCheck) {
-        let mut status = self.health_status.write().await;
-        let mut counts = self.failure_counts.write().await;
-        let mut last = self.last_check.write().await;
+        // 先在锁内收集决策信息，然后释放锁再执行 failover
+        let should_failover: Option<(String, String)>;
 
-        let component = check.component.clone();
-        let old_status = status.get(&component).copied().unwrap_or(HealthStatus::Healthy);
+        {
+            let mut status = self.health_status.write().await;
+            let mut counts = self.failure_counts.write().await;
+            let mut last = self.last_check.write().await;
 
-        // Update last check time
-        last.insert(component.clone(), check.timestamp);
+            let component = check.component.clone();
+            let old_status = status.get(&component).copied().unwrap_or(HealthStatus::Healthy);
 
-        // Update status and failure count
-        match check.status {
-            HealthStatus::Healthy => {
-                if old_status != HealthStatus::Healthy {
-                    info!("[Failover] Component {} recovered to healthy", component);
-                    let _ = self.event_tx.send(FailoverEvent::RecoveryCompleted {
-                        component: component.clone(),
-                    });
+            // Update last check time
+            last.insert(component.clone(), check.timestamp);
+
+            // Update status and failure count
+            match check.status {
+                HealthStatus::Healthy => {
+                    if old_status != HealthStatus::Healthy {
+                        info!("[Failover] Component {} recovered to healthy", component);
+                        let _ = self.event_tx.send(FailoverEvent::RecoveryCompleted {
+                            component: component.clone(),
+                        });
+                    }
+                    counts.insert(component.clone(), 0);
+                    should_failover = None;
                 }
-                counts.insert(component.clone(), 0);
-            }
-            HealthStatus::Degraded | HealthStatus::Unhealthy => {
-                let count = counts.entry(component.clone()).or_insert(0);
-                *count += 1;
-                
-                if *count >= self.config.failure_threshold {
-                    warn!(
-                        "[Failover] Component {} failed threshold {}/{}",
-                        component, count, self.config.failure_threshold
-                    );
-                    
-                    if self.config.auto_failover && old_status.is_healthy() {
-                        self.trigger_failover(&component, &check.message).await;
+                HealthStatus::Degraded | HealthStatus::Unhealthy => {
+                    let count = counts.entry(component.clone()).or_insert(0);
+                    *count += 1;
+
+                    if *count >= self.config.failure_threshold
+                        && self.config.auto_failover
+                        && old_status.is_healthy()
+                    {
+                        warn!(
+                            "[Failover] Component {} failed threshold {}/{}",
+                            component, count, self.config.failure_threshold
+                        );
+                        should_failover = Some((component.clone(), check.message.clone()));
+                    } else {
+                        should_failover = None;
                     }
                 }
             }
+
+            status.insert(component, check.status);
+            // 所有 RwLock 写锁在此作用域结束时自动释放
         }
 
-        status.insert(component, check.status);
+        // 在锁外执行 failover（其中包含 async sleep，不能持锁）
+        if let Some((component, message)) = should_failover {
+            self.trigger_failover(&component, &message).await;
+        }
     }
 
     /// Trigger automatic failover
