@@ -140,7 +140,7 @@ func TestFallbackRegexExtractor_Variations(t *testing.T) {
 
 // TestProcessInput_EmptyInput tests processing empty input
 func TestProcessInput_EmptyInput(t *testing.T) {
-	_, err := ProcessInput("")
+	_, err := ProcessInput("", nil)
 	// Should return an error (either LLM or fallback failure)
 	if err == nil {
 		t.Log("Expected error for empty input (behavior may vary)")

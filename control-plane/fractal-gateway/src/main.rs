@@ -1,10 +1,11 @@
 use aya::programs::{Xdp, XdpFlags};
-use aya::{include_bytes_aligned, Bpf};
+use aya::{include_bytes_aligned, Ebpf};
 use aya::maps::HashMap;
-use aya_log::BpfLogger;
+use aya_log::EbpfLogger;
 use clap::Parser;
 use log::{info, warn};
 use tokio::signal;
+use anyhow::Context;
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -29,15 +30,15 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // This will include your eBPF object file as raw bytes at compile-time and load it.
     #[cfg(debug_assertions)]
-    let mut bpf = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/fractal-gateway"
+    let mut bpf = Ebpf::load(include_bytes_aligned!(
+        "../../target/bpfel-unknown-none/debug/fractal-gateway-ebpf"
     ))?;
     #[cfg(not(debug_assertions))]
-    let mut bpf = Bpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/fractal-gateway"
+    let mut bpf = Ebpf::load(include_bytes_aligned!(
+        "../../target/bpfel-unknown-none/release/fractal-gateway-ebpf"
     ))?;
 
-    if let Err(e) = BpfLogger::init(&mut bpf) {
+    if let Err(e) = EbpfLogger::init(&mut bpf) {
         warn!("failed to initialize eBPF logger: {}", e);
     }
 
@@ -58,7 +59,7 @@ async fn main() -> Result<(), anyhow::Error> {
         bpf.map_mut("BLOCKED_IPS")
             .context("failed to find eBPF map 'BLOCKED_IPS' - ensure the eBPF code is compiled")?,
     )?;
-    
+
     // Example: Block IP 192.168.1.100 (in network-byte order)
     let malicious_ip: u32 = u32::from_be_bytes([192, 168, 1, 100]);
     blocked_ips.insert(malicious_ip, 1, 0)?;

@@ -1,0 +1,21 @@
+# Dockerfile for running SMA-OS services
+FROM rust:latest
+
+WORKDIR /workspace
+
+# Copy environment variables
+COPY .env .env
+
+# Copy compiled binaries
+COPY control-plane/target/release/state-engine /usr/local/bin/
+COPY control-plane/target/release/teardown-ctrl /usr/local/bin/
+COPY memory-bus/bin/ingestion /usr/local/bin/
+COPY orchestration/bin/manager /usr/local/bin/
+
+# Make binaries executable
+RUN chmod +x /usr/local/bin/state-engine /usr/local/bin/teardown-ctrl /usr/local/bin/ingestion /usr/local/bin/manager
+
+# Expose ports
+EXPOSE 8080 8081 8082 8083
+
+CMD ["echo", "Run individual services with: state-engine, teardown-ctrl, ingestion, manager"]

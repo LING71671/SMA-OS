@@ -4,6 +4,7 @@ members = [
     "fractal-gateway",
     "fractal-gateway-ebpf",
     "teardown-ctrl",
-    "identity"
+    "identity",
+    "xtask",
 ]
 resolver = "2"

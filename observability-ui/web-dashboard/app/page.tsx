@@ -33,8 +33,8 @@ const initialEdges = [
 ];
 
 export default function DagViewer() {
-  const [nodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, , onNodesChange] = useNodesState(initialNodes);
+  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
   return (
     <div style={{ width: "100vw", height: "100vh", position: "relative" }}>

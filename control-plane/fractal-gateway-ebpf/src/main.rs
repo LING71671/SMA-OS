@@ -1,7 +1,7 @@
-//! Fractal Gateway eBPF - Main Entry Point
+//! Fractal Gateway eBPF - XDP Packet Filtering
 //!
-//! This program demonstrates loading and managing the eBPF XDP program
-//! for network filtering and IP blocking.
+//! This is the eBPF program that runs in kernel space for nanosecond-level
+//! network filtering and IP blocking.
 
 #![no_std]
 #![no_main]
@@ -18,10 +18,11 @@ use network_types::{
     ip::Ipv4Hdr,
 };
 
-// Define a eBPF Map to store blocked destination/source IP addresses dynamically
+/// Map to store blocked IP addresses (max 1024 entries)
 #[map]
 static BLOCKED_IPS: HashMap<u32, u8> = HashMap::with_max_entries(1024, 0);
 
+/// XDP program entry point
 #[xdp]
 pub fn fractal_gateway(ctx: XdpContext) -> u32 {
     match try_fractal_gateway(ctx) {
@@ -31,7 +32,7 @@ pub fn fractal_gateway(ctx: XdpContext) -> u32 {
 }
 
 fn try_fractal_gateway(ctx: XdpContext) -> Result<u32, ()> {
-    info!(&ctx, "Nanosecond Fractal Gateway Packet Intercepted");
+    info!(&ctx, "Fractal Gateway: packet intercepted");
 
     let ethhdr: *const EthHdr = unsafe { ptr_at(&ctx, 0)? };
     match unsafe { (*ethhdr).ether_type } {
@@ -42,13 +43,9 @@ fn try_fractal_gateway(ctx: XdpContext) -> Result<u32, ()> {
     let ipv4hdr: *const Ipv4Hdr = unsafe { ptr_at(&ctx, EthHdr::LEN)? };
     let source = u32::from_be(unsafe { (*ipv4hdr).src_addr });
 
-    // Look up the packet's source IP in the BPF Map
-    // If it exists in BLOCKED_IPS, we DROP it at the nanosecond kernel level
+    // Check if source IP is in blocked list
     if unsafe { BLOCKED_IPS.get(&source) }.is_some() {
-        info!(
-            &ctx,
-            "!!! FRACTAL SHIELD TRIGGERED: Dropping packet from blocked IP !!!"
-        );
+        info!(&ctx, "FRACTAL SHIELD: dropping packet from blocked IP");
         return Ok(xdp_action::XDP_DROP);
     }
 
@@ -65,4 +62,10 @@ unsafe fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
         return Err(());
     }
     Ok((start + offset) as *const T)
+}
+
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    // eBPF programs cannot panic, this is a placeholder
+    loop {}
 }

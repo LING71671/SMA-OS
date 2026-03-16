@@ -1,0 +1,39 @@
+# Dockerfile for building SMA-OS eBPF and Rust components
+FROM rust:latest
+
+# Install required system dependencies
+RUN apt-get update && apt-get install -y \
+    protobuf-compiler \
+    clang \
+    llvm \
+    lld \
+    libelf-dev \
+    libbpf-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install nightly toolchain with rust-src for eBPF
+RUN rustup toolchain install nightly --component rust-src
+
+# Install bpf-linker
+RUN cargo install bpf-linker
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy project files
+COPY . .
+
+# Build eBPF program
+RUN cd control-plane && \
+    cargo +nightly build -p fractal-gateway-ebpf \
+    --target bpfel-unknown-none \
+    -Z build-std=core \
+    --release
+
+# Build userspace programs
+RUN cd control-plane && \
+    cargo build --release -p state-engine -p teardown-ctrl
+
+# List build artifacts
+RUN ls -la control-plane/target/bpfel-unknown-none/release/ && \
+    ls -la control-plane/target/release/
