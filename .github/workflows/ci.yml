@@ -1,0 +1,209 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  GO_VERSION: '1.21'
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================
+  # Rust Build and Test
+  # ============================================
+  rust-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            control-plane/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      
+      - name: Check formatting
+        run: cd control-plane && cargo fmt -- --check
+      
+      - name: Run clippy
+        run: cd control-plane && cargo clippy --all-targets --all-features -- -D warnings
+      
+      - name: Run tests
+        run: cd control-plane && cargo test --release -p state-engine -p teardown-ctrl -p identity
+
+  # ============================================
+  # Go Build and Test
+  # ============================================
+  go-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Run tests
+        run: |
+          cd memory-bus && go test -v -race ./...
+          cd ../orchestration && go test -v -race ./...
+      
+      - name: Build binaries
+        run: |
+          cd memory-bus && go build -o bin/ingestion ./ingestion
+          cd ../orchestration && go build -o bin/manager ./manager
+
+  # ============================================
+  # Frontend Build
+  # ============================================
+  frontend-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: observability-ui/web-dashboard/package-lock.json
+      
+      - name: Install dependencies
+        run: cd observability-ui/web-dashboard && npm ci
+      
+      - name: Lint
+        run: cd observability-ui/web-dashboard && npm run lint
+      
+      - name: Build
+        run: cd observability-ui/web-dashboard && npm run build
+
+  # ============================================
+  # eBPF Build (Linux only)
+  # ============================================
+  ebpf-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm lld libelf-dev libbpf-dev protobuf-compiler
+      
+      - name: Install bpf-linker
+        run: cargo install bpf-linker
+      
+      - name: Build eBPF
+        run: |
+          cd control-plane
+          cargo +nightly build -p fractal-gateway-ebpf \
+            --target bpfel-unknown-none \
+            -Z build-std=core \
+            --release
+      
+      - name: Upload eBPF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ebpf-binary
+          path: control-plane/target/bpfel-unknown-none/release/fractal-gateway-ebpf
+
+  # ============================================
+  # Build Release Artifacts
+  # ============================================
+  build-release:
+    needs: [rust-check, go-check, frontend-check, ebpf-build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Build Rust binaries
+        run: |
+          cd control-plane
+          cargo build --release -p state-engine -p teardown-ctrl -p identity
+      
+      - name: Build Go binaries
+        run: |
+          cd memory-bus && go build -o bin/ingestion ./ingestion
+          cd ../orchestration && go build -o bin/manager ./manager
+      
+      - name: Download eBPF artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ebpf-binary
+      
+      - name: Create release archive
+        run: |
+          mkdir -p release
+          cp control-plane/target/release/state-engine release/
+          cp control-plane/target/release/teardown-ctrl release/
+          cp control-plane/target/release/identity release/ || true
+          cp memory-bus/bin/ingestion release/
+          cp orchestration/bin/manager release/
+          cp fractal-gateway-ebpf release/
+          tar -czvf sma-os-${{ github.ref_name }}-linux-x64.tar.gz -C release .
+      
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sma-os-release
+          path: sma-os-*.tar.gz
+
+  # ============================================
+  # Create GitHub Release
+  # ============================================
+  create-release:
+    needs: build-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sma-os-release
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: sma-os-*.tar.gz
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: true
