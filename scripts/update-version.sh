@@ -64,8 +64,8 @@ fi
 sed -i "s/^# SMA-OS v[0-9]\+\.[0-9]\+\.[0-9]\+$/# SMA-OS v${NEW_VERSION}/" README.md 2>/dev/null || true
 
 # RELEASE_NOTES.md - 如果创建新版本
-if [ -f "RELEASE_NOTES.md" ]; then
-    sed -i "1s/^# SMA-OS Release v.*/# SMA-OS Release v${NEW_VERSION}/" RELEASE_NOTES.md 2>/dev/null || true
+if [ -f "docs/ops/RELEASE_NOTES.md" ]; then
+sed -i "1s/^# SMA-OS Release v.*/# SMA-OS Release v${NEW_VERSION}/" docs/ops/RELEASE_NOTES.md 2>/dev/null || true
 fi
 
 echo ""

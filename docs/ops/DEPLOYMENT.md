@@ -84,14 +84,14 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace rust:latest \
 #### eBPF 程序
 ```bash
 # 使用提供的脚本
-./build-ebpf.sh
+./scripts/build-ebpf.sh
 ```
 
 ### 5. 运行服务
 
 ```bash
 # 使用启动脚本
-./start-services.sh
+./scripts/start-services.sh
 
 # 或手动启动
 ./memory-bus/bin/ingestion &
@@ -124,7 +124,7 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace rust:latest \
 
 | 组件 | 功能 | 端口 |
 |------|------|------|
-| ingestion | SLM 意图提取 (DeepSeek) | 8086 |
+| ingestion | SLM 意图提取 (AI 大模型) | 8086 |
 | vector-kv | 向量+KV 存储 | 8087 |
 
 ### Observability UI
@@ -142,14 +142,14 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace rust:latest \
 ```bash
 # 本地运行所有服务
 docker-compose up -d
-./start-services.sh
+./scripts/start-services.sh
 ```
 
 ### Docker 部署
 
 ```bash
 # 构建 Docker 镜像
-docker build -f Dockerfile.services -t sma-os:latest .
+docker build -f docker/Dockerfile.services -t sma-os:latest .
 
 # 运行容器
 docker run -d --name sma-os \
@@ -310,14 +310,14 @@ ls /sys/kernel/btf/vmlinux
 sudo ./fractal-gateway-ebpf
 ```
 
-#### 4. DeepSeek API 错误
+#### 4. AI 大模型 API 错误
 
 ```bash
 # 检查 API 密钥
-echo $DEEPSEEK_API_KEY
+echo $AI_API_KEY
 
-# 测试 API 连接
-curl -X POST https://api.deepseek.com/chat/completions \
+# 测试 API 连接（示例）
+curl -X POST https://api.example.com/chat/completions \\
   -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model": "deepseek-chat", "messages": [{"role": "user", "content": "test"}]}'
@@ -358,9 +358,9 @@ docker logs -f sma-os-postgres-1
 
 ## 更多资源
 
-- [API 文档](./docs/api.md)
-- [架构设计](./docs/architecture.md)
-- [贡献指南](./CONTRIBUTING.md)
+- [API 文档](../api.md)
+- [架构设计](../architecture.md)
+- [贡献指南](../contributing/CONTRIBUTING.md)
 - [更新日志](./RELEASE_NOTES.md)
 
 ---

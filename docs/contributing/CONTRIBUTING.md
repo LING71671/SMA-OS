@@ -157,7 +157,7 @@ Closes #123
 如果您有任何问题，可以：
 
 1. 在 [Issues](https://github.com/LING71671/SMA-OS/issues) 中提问
-2. 查看 [文档](docs/DEPLOYMENT.md)
+2. 查看 [部署文档](../ops/DEPLOYMENT.md)
 
 ---
 

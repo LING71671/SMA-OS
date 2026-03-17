@@ -30,39 +30,39 @@ jobs:
           files = "${{ steps.changes.outputs.files }}".split()
           warnings = []
           
-          # 定义文件依赖规则
-          rules = [
-              {
-                  "pattern": r"^VERSION$",
-                  "reminder": "📁 **VERSION** 文件已修改，请检查以下文件是否需要同步更新：\n- `README.md` - 版本号徽章\n- `Cargo.toml` (所有模块) - version 字段\n- `package.json` - version 字段\n- `RELEASE_NOTES.md` - 更新日志",
-                  "check_files": ["README.md", "RELEASE_NOTES.md"]
-              },
-              {
-                  "pattern": r"^control-plane/state-engine/src/.*\.rs$",
-                  "reminder": "📁 **state-engine** 源码已修改，请检查：\n- `control-plane/state-engine/tests/` - 相关测试\n- `docs/api/` - API 文档（如有）",
-                  "check_files": []
-              },
-              {
-                  "pattern": r"^sma-proto/.*\.proto$",
-                  "reminder": "📁 **sma-proto** 协议定义已修改，请检查：\n- `control-plane/` - Rust 服务实现\n- `memory-bus/` - Go 服务实现\n- `orchestration/` - Go 服务实现\n\n所有依赖 gRPC 的服务可能需要更新！",
-                  "check_files": []
-              },
-              {
-                  "pattern": r"^\.github/workflows/.*\.yml$",
-                  "reminder": "📁 **CI/CD 配置**已修改，请检查：\n- CI 文档是否需要更新\n- 是否需要通知团队成员",
-                  "check_files": []
-              },
-              {
-                  "pattern": r"^docker-compose\.yml$",
-                  "reminder": "📁 **docker-compose.yml** 已修改，请检查：\n- `.env.example` - 环境变量示例\n- `docs/DEPLOYMENT.md` - 部署文档",
-                  "check_files": [".env.example", "docs/DEPLOYMENT.md"]
-              },
-              {
-                  "pattern": r"^AGENTS\.md$",
-                  "reminder": "📁 **AGENTS.md** 已修改，请检查：\n- 各模块的 `AGENTS.md` 是否需要同步更新\n- `AI_DEVELOPER_GUIDE.md` - 开发指南",
-                  "check_files": []
-              }
-          ]
+# 定义文件依赖规则
+rules = [
+{
+"pattern": r"^VERSION$",
+"reminder": "📁 **VERSION** 文件已修改，请检查以下文件是否需要同步更新：\n- `README.md` - 版本号徽章\n- `Cargo.toml` (所有模块) - version 字段\n- `package.json` - version 字段\n- `docs/ops/RELEASE_NOTES.md` - 更新日志",
+"check_files": ["README.md", "docs/ops/RELEASE_NOTES.md"]
+},
+{
+"pattern": r"^control-plane/state-engine/src/.*\.rs$",
+"reminder": "📁 **state-engine** 源码已修改，请检查：\n- `control-plane/state-engine/tests/` - 相关测试\n- `docs/api/` - API 文档（如有）",
+"check_files": []
+},
+{
+"pattern": r"^sma-proto/.*\.proto$",
+"reminder": "📁 **sma-proto** 协议定义已修改，请检查：\n- `control-plane/` - Rust 服务实现\n- `memory-bus/` - Go 服务实现\n- `orchestration/` - Go 服务实现\n\n所有依赖 gRPC 的服务可能需要更新！",
+"check_files": []
+},
+{
+"pattern": r"^\.github/workflows/.*\.yml$",
+"reminder": "📁 **CI/CD 配置**已修改，请检查：\n- CI 文档是否需要更新\n- 是否需要通知团队成员",
+"check_files": []
+},
+{
+"pattern": r"^docker-compose\.yml$",
+"reminder": "📁 **docker-compose.yml** 已修改，请检查：\n- `.env.example` - 环境变量示例\n- `docs/ops/DEPLOYMENT.md` - 部署文档",
+"check_files": [".env.example", "docs/ops/DEPLOYMENT.md"]
+},
+{
+"pattern": r"^docs/dev/AGENTS\.md$",
+"reminder": "📁 **AGENTS.md** 已修改，请检查：\n- 各模块的 `AGENTS.md` 是否需要同步更新\n- `docs/dev/AI_DEVELOPER_GUIDE.md` - 开发指南",
+"check_files": []
+}
+]
           
           for file in files:
               for rule in rules:

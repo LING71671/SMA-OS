@@ -71,7 +71,7 @@
 - 修改了 README.md 中提到的功能 → 更新 `README.md`
 - 添加了新模块 → 更新 `README.md` 组件列表
 - 版本号变更 → 运行 `./scripts/update-version.sh <version>`
-- 新增 CI/CD 配置 → 更新 `docs/DEPLOYMENT.md`
+- 新增 CI/CD 配置 → 更新 `docs/ops/DEPLOYMENT.md`
 
 ### 5.4 版本号管理
 

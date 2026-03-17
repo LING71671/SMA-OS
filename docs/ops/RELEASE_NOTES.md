@@ -19,7 +19,7 @@ This release includes major improvements to the eBPF infrastructure, test covera
 - **evaluator**: Output validation and rollback
 
 ### Memory Bus (Go)
-- **ingestion**: SLM-powered intent extraction with DeepSeek
+- **ingestion**: SLM-powered intent extraction with AI LLM
 - **vector-kv**: Vector + KV storage with compression
 
 ### Observability UI (TypeScript)
@@ -73,10 +73,10 @@ This release includes major improvements to the eBPF infrastructure, test covera
 docker-compose up -d
 
 # Build (in Docker for eBPF)
-./build-ebpf.sh
+./scripts/build-ebpf.sh
 
 # Run services
-./start-services.sh
+./scripts/start-services.sh
 ```
 
 ---

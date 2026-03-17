@@ -258,9 +258,9 @@ jobs:
         with:
           name: sma-os-release
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: sma-os-*.tar.gz
-          body_path: RELEASE_NOTES.md
-          generate_release_notes: true
+- name: Create GitHub Release
+  uses: softprops/action-gh-release@v1
+  with:
+    files: sma-os-*.tar.gz
+    body_path: docs/ops/RELEASE_NOTES.md
+    generate_release_notes: true

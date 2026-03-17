@@ -9,33 +9,33 @@
 This root AGENTS.md covers project-wide conventions. Module-specific guides:
 
 ### Control Plane (Rust)
-- [`control-plane/state-engine/AGENTS.md`](control-plane/state-engine/AGENTS.md) - Event sourcing state kernel
-- [`control-plane/fractal-gateway/AGENTS.md`](control-plane/fractal-gateway/AGENTS.md) - eBPF security gateway
-- [`control-plane/fractal-gateway-ebpf/AGENTS.md`](control-plane/fractal-gateway-ebpf/AGENTS.md) - XDP packet filtering 🆕
-- [`control-plane/formal-verifier/AGENTS.md`](control-plane/formal-verifier/AGENTS.md) - TLA+ formal verification 🆕
-- [`control-plane/teardown-ctrl/AGENTS.md`](control-plane/teardown-ctrl/AGENTS.md) - Cascading cleanup controller 🆕
+- [`control-plane/state-engine/AGENTS.md`](../../control-plane/state-engine/AGENTS.md) - Event sourcing state kernel
+- [`control-plane/fractal-gateway/AGENTS.md`](../../control-plane/fractal-gateway/AGENTS.md) - eBPF security gateway
+- [`control-plane/fractal-gateway-ebpf/AGENTS.md`](../../control-plane/fractal-gateway-ebpf/AGENTS.md) - XDP packet filtering 🆕
+- [`control-plane/formal-verifier/AGENTS.md`](../../control-plane/formal-verifier/AGENTS.md) - TLA+ formal verification 🆕
+- [`control-plane/teardown-ctrl/AGENTS.md`](../../control-plane/teardown-ctrl/AGENTS.md) - Cascading cleanup controller 🆕
 
 ### Orchestration (Go)
-- [`orchestration/manager/AGENTS.md`](orchestration/manager/AGENTS.md) - DAG topological execution
-- [`orchestration/scheduler/AGENTS.md`](orchestration/scheduler/AGENTS.md) - Worker dispatch and warm pool
-- [`orchestration/evaluator/AGENTS.md`](orchestration/evaluator/AGENTS.md) - Output validation and rollback
+- [`orchestration/manager/AGENTS.md`](../../orchestration/manager/AGENTS.md) - DAG topological execution
+- [`orchestration/scheduler/AGENTS.md`](../../orchestration/scheduler/AGENTS.md) - Worker dispatch and warm pool
+- [`orchestration/evaluator/AGENTS.md`](../../orchestration/evaluator/AGENTS.md) - Output validation and rollback
 
 ### Memory Bus (Go)
-- [`memory-bus/ingestion/AGENTS.md`](memory-bus/ingestion/AGENTS.md) - SLM-powered intent extraction
-- [`memory-bus/vector-kv/AGENTS.md`](memory-bus/vector-kv/AGENTS.md) - Vector + KV storage with compression
+- [`memory-bus/ingestion/AGENTS.md`](../../memory-bus/ingestion/AGENTS.md) - SLM-powered intent extraction
+- [`memory-bus/vector-kv/AGENTS.md`](../../memory-bus/vector-kv/AGENTS.md) - Vector + KV storage with compression
 
 ### Execution Layer (Rust)
-- [`execution-layer/sandbox-daemon/AGENTS.md`](execution-layer/sandbox-daemon/AGENTS.md) - Firecracker MicroVM lifecycle
-- [`execution-layer/stateful-repl/AGENTS.md`](execution-layer/stateful-repl/AGENTS.md) - Persistent terminal sessions
+- [`execution-layer/sandbox-daemon/AGENTS.md`](../../execution-layer/sandbox-daemon/AGENTS.md) - Firecracker MicroVM lifecycle
+- [`execution-layer/stateful-repl/AGENTS.md`](../../execution-layer/stateful-repl/AGENTS.md) - Persistent terminal sessions
 
 ### Plugins (Rust) 🆕
-- [`plugins/AGENTS.md`](plugins/AGENTS.md) - Plugin architecture (core + marketplace)
+- [`plugins/AGENTS.md`](../../plugins/AGENTS.md) - Plugin architecture (core + marketplace)
 
 ### Security Audit (Rust) 🆕
-- [`security-audit/AGENTS.md`](security-audit/AGENTS.md) - Automated security scanning
+- [`security-audit/AGENTS.md`](../../security-audit/AGENTS.md) - Automated security scanning
 
 ### Observability (TypeScript)
-- [`observability-ui/web-dashboard/AGENTS.md`](observability-ui/web-dashboard/AGENTS.md) - Next.js observability UI
+- [`observability-ui/web-dashboard/AGENTS.md`](../../observability-ui/web-dashboard/AGENTS.md) - Next.js observability UI
 
 ---
 
