@@ -46,6 +46,8 @@ const (
 	Running   TaskStatus = "RUNNING"
 	Completed TaskStatus = "COMPLETED"
 	Failed    TaskStatus = "FAILED"
+	Paused    TaskStatus = "PAUSED"
+	Resumed   TaskStatus = "RESUMED"
 )
 
 // TaskNode represents a single sub-task in the Cognitive DAG
@@ -55,7 +57,11 @@ type TaskNode struct {
 	Dependencies []string
 	Status       TaskStatus
 	Payload      string
-	Scheduled    bool // Prevents duplicate enqueuing when multiple dependencies complete
+	Scheduled    bool    // Prevents duplicate enqueuing when multiple dependencies complete
+	ParentID     *string // Parent task ID for hierarchical tasks
+	SubTasks     []string // Child task IDs
+	Progress     float64  // 0-100 progress percentage
+	IsAtomic     bool     // True if this task cannot be further decomposed
 }
 
 // Orchestrator Manager responsible for Topological Execution
@@ -211,8 +217,21 @@ func (dm *DAGManager) dispatchWorker(task *TaskNode, done chan<- *TaskResult, wg
 	var lastErr error
 	retryCount := 0
 
+	// Register a pause-cancel context for this task
+	pauseCtx, pauseCancel := context.WithCancel(context.Background())
+	cancelRegistry.register(task.ID, pauseCancel)
+	defer cancelRegistry.remove(task.ID)
+
 	// Retry loop
 	for attempt := 0; attempt <= dm.FailureConfig.MaxRetries; attempt++ {
+		// Check if paused before each attempt
+		select {
+		case <-pauseCtx.Done():
+			log.Printf("[Worker] Task %s received pause signal", task.ID)
+			return
+		default:
+		}
+
 		if attempt > 0 {
 			// Calculate backoff delay with overflow protection
 			exponent := float64(attempt - 1)
@@ -232,8 +251,8 @@ func (dm *DAGManager) dispatchWorker(task *TaskNode, done chan<- *TaskResult, wg
 			retryCount++
 		}
 
-		// Create timeout context
-		ctx, cancel := context.WithTimeout(context.Background(), dm.FailureConfig.Timeout)
+		// Create timeout context derived from pause context
+		ctx, cancel := context.WithTimeout(pauseCtx, dm.FailureConfig.Timeout)
 
 		// Execute task with timeout
 		resultChan := make(chan error, 1)
@@ -262,6 +281,11 @@ func (dm *DAGManager) dispatchWorker(task *TaskNode, done chan<- *TaskResult, wg
 			log.Printf("[Worker] Task %s failed (attempt %d/%d): %v", task.ID, attempt+1, dm.FailureConfig.MaxRetries+1, err)
 		case <-ctx.Done():
 			cancel()
+			if pauseCtx.Err() != nil {
+				// Paused, not timed out
+				log.Printf("[Worker] Task %s paused during execution", task.ID)
+				return
+			}
 			lastErr = fmt.Errorf("task timeout after %v", dm.FailureConfig.Timeout)
 			log.Printf("[Worker] Task %s timeout (attempt %d/%d)", task.ID, attempt+1, dm.FailureConfig.MaxRetries+1)
 		}

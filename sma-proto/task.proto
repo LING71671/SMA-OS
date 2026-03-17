@@ -1,0 +1,127 @@
+// SMA-OS Task Management Service Protocol Buffers
+//
+// This protocol defines the gRPC service for task lifecycle management.
+// It supports progress querying, pause/resume, and dependency analysis.
+//
+// Version: 1.0
+
+syntax = "proto3";
+
+package sma.task;
+
+option go_package = "sma-os/sma-proto/task";
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================================================
+// Task Management Service
+// ============================================================================
+
+service TaskManagement {
+    // Query the progress of a task
+    rpc GetTaskProgress(GetTaskProgressRequest) returns (TaskProgressResponse);
+
+    // Pause a running task
+    rpc PauseTask(PauseTaskRequest) returns (PauseTaskResponse);
+
+    // Resume a paused task
+    rpc ResumeTask(ResumeTaskRequest) returns (ResumeTaskResponse);
+
+    // Get dependency analysis for a DAG
+    rpc GetDependencyAnalysis(GetDependencyAnalysisRequest) returns (DependencyAnalysisResponse);
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum TaskStatus {
+    TASK_STATUS_UNSPECIFIED = 0;
+    TASK_STATUS_PENDING     = 1;
+    TASK_STATUS_RUNNING     = 2;
+    TASK_STATUS_COMPLETED   = 3;
+    TASK_STATUS_FAILED      = 4;
+    TASK_STATUS_PAUSED      = 5;
+    TASK_STATUS_RESUMED     = 6;
+}
+
+// ============================================================================
+// GetTaskProgress
+// ============================================================================
+
+message GetTaskProgressRequest {
+    string task_id  = 1;
+    string tenant_id = 2;
+}
+
+message SubTaskProgress {
+    string     task_id  = 1;
+    TaskStatus status   = 2;
+    double     progress = 3;
+}
+
+message TaskProgressResponse {
+    string                   task_id       = 1;
+    TaskStatus               status        = 2;
+    double                   progress      = 3;
+    repeated SubTaskProgress sub_tasks     = 4;
+    google.protobuf.Timestamp start_time   = 5;
+    google.protobuf.Timestamp updated_at   = 6;
+}
+
+// ============================================================================
+// PauseTask
+// ============================================================================
+
+message PauseTaskRequest {
+    string task_id   = 1;
+    string tenant_id = 2;
+}
+
+message PauseTaskResponse {
+    bool   success        = 1;
+    string checkpoint_id  = 2;
+    string error_message  = 3;
+}
+
+// ============================================================================
+// ResumeTask
+// ============================================================================
+
+message ResumeTaskRequest {
+    string task_id   = 1;
+    string tenant_id = 2;
+}
+
+message ResumeTaskResponse {
+    bool   success       = 1;
+    string error_message = 2;
+}
+
+// ============================================================================
+// DependencyAnalysis
+// ============================================================================
+
+message GetDependencyAnalysisRequest {
+    string dag_id    = 1;
+    string tenant_id = 2;
+}
+
+message DependencyMatrixEntry {
+    string task_id      = 1;
+    repeated string deps = 2;
+    int32  depth        = 3;
+}
+
+message CriticalPathEntry {
+    string task_id = 1;
+    double weight  = 2;
+}
+
+message DependencyAnalysisResponse {
+    repeated DependencyMatrixEntry matrix        = 1;
+    repeated CriticalPathEntry     critical_path = 2;
+    repeated string                cycles        = 3;
+    int32                          max_parallelism = 4;
+    int32                          max_depth      = 5;
+}
