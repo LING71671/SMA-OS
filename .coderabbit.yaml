@@ -1,0 +1,205 @@
+# CodeRabbit Configuration for SMA-OS
+# https://docs.coderabbit.ai/reference/configuration
+
+# ============================================================
+# 通用设置
+# ============================================================
+language: "zh-CN"  # 使用中文进行评审
+
+# 评审风格：chill（轻松）或 assertive（严格）
+tone_instructions: |
+  请用友好、建设性的语气进行代码评审。
+  关注安全性、性能和代码正确性，而不是格式细节。
+  对于 eBPF 和异步代码，请特别关注潜在的安全问题。
+
+# ============================================================
+# 评审设置
+# ============================================================
+reviews:
+  profile: "chill"  # 轻松的评审风格
+  
+  # 自动评审配置
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+      - "draft"
+    drafts: false
+  
+  # 生成高级摘要
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  
+  # Walkthrough 设置
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: false
+  
+  # 相关问题建议
+  related_issues: true
+  related_prs: true
+  
+  # 标签建议
+  suggested_labels: true
+  auto_apply_labels: false
+  
+  # 审阅者建议
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+  
+  # 关闭诗歌和 fortune（减少噪音）
+  poem: false
+  in_progress_fortune: false
+
+  # ============================================================
+  # 文件路径过滤 - 排除不需要评审的文件
+  # ============================================================
+  path_filters:
+    - "!**/target/**"
+    - "!**/node_modules/**"
+    - "!**/.next/**"
+    - "!**/dist/**"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
+    - "!**/Cargo.lock"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    - "!**/go.sum"
+    - "!**/*.log"
+    - "!**/tmp/**"
+    - "!**/.env*"
+
+  # ============================================================
+  # 文件路径特定指令 - 针对不同文件类型的评审重点
+  # ============================================================
+  path_instructions:
+    # Rust 代码 - 关注内存安全和并发
+    - path: "**/*.rs"
+      instructions: |
+        评审 Rust 代码时，请特别关注：
+        1. 内存安全：检查是否有潜在的 panic、unwrap 或 expect
+        2. 并发安全：检查 async/await 的正确使用，是否有死锁风险
+        3. 错误处理：确保错误被正确传播，不要使用 `?` 忽略重要错误
+        4. 性能：检查不必要的 clone() 或 allocation
+        5. 安全：检查是否有 SQL 注入、命令注入等风险
+
+    # eBPF 代码 - 特别关注内核安全
+    - path: "**/fractal-gateway-ebpf/**/*.rs"
+      instructions: |
+        评审 eBPF 代码时，请特别关注：
+        1. 内核安全：确保没有空指针解引用、越界访问
+        2. 性能：eBPF 程序必须快速返回，不能阻塞
+        3. 内存限制：eBPF 栈大小有限（512字节）
+        4. 验证器通过：确保代码能通过内核验证器
+        5. 安全边界：检查包解析是否有整数溢出
+
+    # Go 代码 - 关注并发和错误处理
+    - path: "**/*.go"
+      instructions: |
+        评审 Go 代码时，请特别关注：
+        1. 并发安全：检查 goroutine 泄漏、竞态条件
+        2. 错误处理：不要忽略错误，使用正确的错误包装
+        3. Context 使用：确保 context 被正确传递和取消
+        4. 资源管理：确保文件、连接等资源被正确关闭
+
+    # TypeScript/React 代码
+    - path: "**/*.ts,**/*.tsx"
+      instructions: |
+        评审 TypeScript 代码时，请特别关注：
+        1. 类型安全：避免使用 any，优先使用具体类型
+        2. React 性能：检查不必要的 re-render，使用 useMemo/useCallback
+        3. 可访问性：确保组件符合 a11y 标准
+        4. 安全：检查是否有 XSS 风险
+
+    # 配置文件
+    - path: "**/*.yml,**/*.yaml"
+      instructions: |
+        评审配置文件时，请检查：
+        1. 安全性：不要硬编码密钥或密码
+        2. 资源限制：检查是否有合理的资源限制
+        3. 版本兼容：检查 API 版本是否兼容
+
+    # Protobuf 定义
+    - path: "**/*.proto"
+      instructions: |
+        评审 Protobuf 文件时，请检查：
+        1. 向后兼容：字段编号不要重复使用
+        2. 命名规范：使用 snake_case
+        3. 文档：重要字段应有注释
+
+    # Markdown 文档
+    - path: "**/*.md"
+      instructions: |
+        评审文档时，请检查：
+        1. 链接有效性：确保链接指向正确的位置
+        2. 代码示例：确保代码示例可以运行
+        3. 版本号：确保版本号与 VERSION 文件一致
+
+    # Shell 脚本
+    - path: "**/*.sh"
+      instructions: |
+        评审 Shell 脚本时，请检查：
+        1. 错误处理：使用 set -e 或正确处理错误
+        2. 安全：检查命令注入风险
+        3. 可移植性：考虑不同环境的兼容性
+
+  # ============================================================
+  # Pre-merge 检查
+  # ============================================================
+  pre_merge_checks:
+    title:
+      mode: "warning"
+      requirements: |
+        PR 标题应遵循 Conventional Commits 格式：
+        - feat: 新功能
+        - fix: 修复 bug
+        - docs: 文档更新
+        - chore: 维护任务
+        - refactor: 重构
+        - test: 测试相关
+        - ci: CI/CD 相关
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "warning"
+
+  # ============================================================
+  # Finishing Touches - 自动生成
+  # ============================================================
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+    simplify:
+      enabled: false
+
+  # ============================================================
+  # 工具集成
+  # ============================================================
+  tools:
+    shellcheck:
+      enabled: true
+    golangci-lint:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    hadolint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    actionlint:
+      enabled: true
+
+# ============================================================
+# 聊天功能
+# ============================================================
+chat:
+  auto_reply: true

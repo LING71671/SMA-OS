@@ -1,0 +1,128 @@
+name: File Dependency Reminder
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get changed files
+        id: changes
+        run: |
+          echo "files=$(git diff --name-only origin/main...HEAD | tr '\n' ' ')" >> $GITHUB_OUTPUT
+      
+      - name: Check dependencies
+        id: check
+        run: |
+          python3 << 'PYTHON'
+          import os
+          import re
+          
+          files = "${{ steps.changes.outputs.files }}".split()
+          warnings = []
+          
+          # 定义文件依赖规则
+          rules = [
+              {
+                  "pattern": r"^VERSION$",
+                  "reminder": "📁 **VERSION** 文件已修改，请检查以下文件是否需要同步更新：\n- `README.md` - 版本号徽章\n- `Cargo.toml` (所有模块) - version 字段\n- `package.json` - version 字段\n- `RELEASE_NOTES.md` - 更新日志",
+                  "check_files": ["README.md", "RELEASE_NOTES.md"]
+              },
+              {
+                  "pattern": r"^control-plane/state-engine/src/.*\.rs$",
+                  "reminder": "📁 **state-engine** 源码已修改，请检查：\n- `control-plane/state-engine/tests/` - 相关测试\n- `docs/api/` - API 文档（如有）",
+                  "check_files": []
+              },
+              {
+                  "pattern": r"^sma-proto/.*\.proto$",
+                  "reminder": "📁 **sma-proto** 协议定义已修改，请检查：\n- `control-plane/` - Rust 服务实现\n- `memory-bus/` - Go 服务实现\n- `orchestration/` - Go 服务实现\n\n所有依赖 gRPC 的服务可能需要更新！",
+                  "check_files": []
+              },
+              {
+                  "pattern": r"^\.github/workflows/.*\.yml$",
+                  "reminder": "📁 **CI/CD 配置**已修改，请检查：\n- CI 文档是否需要更新\n- 是否需要通知团队成员",
+                  "check_files": []
+              },
+              {
+                  "pattern": r"^docker-compose\.yml$",
+                  "reminder": "📁 **docker-compose.yml** 已修改，请检查：\n- `.env.example` - 环境变量示例\n- `docs/DEPLOYMENT.md` - 部署文档",
+                  "check_files": [".env.example", "docs/DEPLOYMENT.md"]
+              },
+              {
+                  "pattern": r"^AGENTS\.md$",
+                  "reminder": "📁 **AGENTS.md** 已修改，请检查：\n- 各模块的 `AGENTS.md` 是否需要同步更新\n- `AI_DEVELOPER_GUIDE.md` - 开发指南",
+                  "check_files": []
+              }
+          ]
+          
+          for file in files:
+              for rule in rules:
+                  if re.match(rule["pattern"], file):
+                      warning = f"### ⚠️ 文件依赖提醒\n\n{rule['reminder']}\n"
+                      warnings.append(warning)
+          
+          if warnings:
+              # 去重
+              unique_warnings = list(dict.fromkeys(warnings))
+              output = "\n---\n\n".join(unique_warnings)
+              output += "\n\n---\n\n💡 *此提醒由自动化脚本生成，如有误报请忽略。*"
+              
+              # 保存到文件（避免引号问题）
+              with open("/tmp/warnings.md", "w", encoding="utf-8") as f:
+                  f.write(output)
+              
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("has_warnings=true\n")
+          else:
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("has_warnings=false\n")
+          PYTHON
+        env:
+          FILES: ${{ steps.changes.outputs.files }}
+      
+      - name: Comment on PR
+        if: steps.check.outputs.has_warnings == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const warnings = fs.readFileSync('/tmp/warnings.md', 'utf8');
+            
+            // 查找已有的提醒评论
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(c => 
+              c.user.type === 'Bot' && 
+              c.body.includes('文件依赖提醒')
+            );
+            
+            if (botComment) {
+              // 更新已有评论
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: warnings
+              });
+            } else {
+              // 创建新评论
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: warnings
+              });
+            }
