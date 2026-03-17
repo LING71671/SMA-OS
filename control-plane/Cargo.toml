@@ -8,3 +8,12 @@ members = [
     "xtask",
 ]
 resolver = "2"
+
+# 工作空间共享的版本号
+# 更新版本时运行: ./scripts/update-version.sh <new_version>
+[workspace.package]
+version = "1.1.0"
+edition = "2021"
+authors = ["LING71671"]
+license = "Apache-2.0"
+repository = "https://github.com/LING71671/SMA-OS"
