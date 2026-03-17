@@ -150,6 +150,14 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace rust:latest \
 - [部署指南](docs/DEPLOYMENT.md)
 - [更新日志](RELEASE_NOTES.md)
 - [AI 开发指引](AI_DEVELOPER_GUIDE.md)
+- [安全审计](docs/security/SECURITY_AUDIT.md)
+
+<details>
+<summary>更多文档</summary>
+
+- [代码审查问题](docs/research/CODE_REVIEW_ISSUES.md)
+- [分布式系统研究](docs/research/distributed-systems-reconnection-task-allocation.md)
+</details>
 
 ## 🤝 贡献
 
