@@ -109,13 +109,13 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace rust:latest \
   cd control-plane && cargo build --release"
 
 # eBPF 程序 (需要 Linux 内核 4.19+)
-./build-ebpf.sh
+./scripts/build-ebpf.sh
 ```
 
 ### 4. 运行服务
 
 ```bash
-./start-services.sh
+./scripts/start-services.sh
 ```
 
 ## 🧪 测试
@@ -147,21 +147,23 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace rust:latest \
 
 ## 📚 文档
 
-- [部署指南](docs/DEPLOYMENT.md)
-- [更新日志](RELEASE_NOTES.md)
-- [AI 开发指引](AI_DEVELOPER_GUIDE.md)
+- [部署指南](docs/ops/DEPLOYMENT.md)
+- [更新日志](docs/ops/RELEASE_NOTES.md)
+- [AI 开发指引](docs/dev/AI_DEVELOPER_GUIDE.md)
+- [Agent 开发指南](docs/dev/AGENTS.md)
 - [安全审计](docs/security/SECURITY_AUDIT.md)
 
 <details>
 <summary>更多文档</summary>
 
+- [贡献指南](docs/contributing/CONTRIBUTING.md)
 - [代码审查问题](docs/research/CODE_REVIEW_ISSUES.md)
 - [分布式系统研究](docs/research/distributed-systems-reconnection-task-allocation.md)
 </details>
 
 ## 🤝 贡献
 
-欢迎参与贡献！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解贡献流程。
+欢迎参与贡献！请阅读 [贡献指南](docs/contributing/CONTRIBUTING.md) 了解贡献流程。
 
 ## 📄 许可证
 
