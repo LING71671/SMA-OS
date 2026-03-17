@@ -31,6 +31,7 @@ yarn-error.log*
 .env.local
 .env.development.local
 .env.test.local
+.env.test.local
 .env.production.local
 *.pem
 
@@ -57,4 +58,9 @@ TASK_*_COMPLETE.md
 
 # Broken path artifacts (tool-generated)
 ASMA-OS*
+nul
+protoc-*.zip
+
+# CI artifacts
+.github/workflows/*.yml.bak
 
