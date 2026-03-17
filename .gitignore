@@ -44,10 +44,11 @@ logs/
 *.log
 
 # Sisyphus task runner artifacts
-.sisyphus/evidence/
-.sisyphus/plans/
+.sisyphus/
 .sisyphusdrafts/
 .sisyphusplans/
+.trae/
+.cursor/
 
 # Debug/temporary files
 compile_err.txt

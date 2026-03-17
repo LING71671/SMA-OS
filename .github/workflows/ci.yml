@@ -13,10 +13,16 @@ env:
 
 jobs:
   # ============================================
-  # Rust Build and Test
+  # Rust Build and Test (only when Rust code changes)
   # ============================================
   rust-check:
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && (
+        contains(github.event.head_commit.modified, 'control-plane/') ||
+        contains(github.event.head_commit.added, 'control-plane/') ||
+        contains(github.event.head_commit.removed, 'control-plane/')
+      )
     steps:
       - uses: actions/checkout@v4
 
@@ -52,10 +58,19 @@ jobs:
         continue-on-error: true
 
   # ============================================
-  # Go Build and Test
+  # Go Build and Test (only when Go code changes)
   # ============================================
   go-check:
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && (
+        contains(github.event.head_commit.modified, 'memory-bus/') ||
+        contains(github.event.head_commit.added, 'memory-bus/') ||
+        contains(github.event.head_commit.removed, 'memory-bus/') ||
+        contains(github.event.head_commit.modified, 'orchestration/') ||
+        contains(github.event.head_commit.added, 'orchestration/') ||
+        contains(github.event.head_commit.removed, 'orchestration/')
+      )
     steps:
       - uses: actions/checkout@v4
 
