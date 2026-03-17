@@ -1,121 +1,137 @@
 # Intent Extraction Module Guide
 
 **Location**: `memory-bus/ingestion/`  
-**Domain**: SLM-powered intent extraction with regex fallback  
+**Domain**: Multi-provider LLM intent extraction with regex fallback  
 **Language**: Go  
-**Score**: 15/25 (LLM integration, distinct NLP domain)
+**Score**: 20/25 (Multi-LLM integration, extensible architecture)
 
 ## Overview
 
-Natural language understanding layer using DeepSeek API with deterministic fallback. Extracts structured intent from user commands, bridging natural language to actionable system operations.
+Natural language understanding layer supporting multiple LLM providers (OpenAI, Anthropic, DeepSeek, Ollama, local models) with deterministic fallback. Extracts structured intent from user commands, bridging natural language to actionable system operations.
 
-## Structure
+## Architecture
 
 ```
 ingestion/
-├── main.go              # DeepSeek API client + fallback logic
-├── go.mod              # Uses sma-os/memory-bus module
-└── main_test.go        # (if exists)
+├── main.go                    # Intent extractor with fallback pipeline
+├── go.mod                     # Module dependencies
+└── internal/
+    ├── llm/
+    │   ├── provider.go        # Provider interface definition
+    │   ├── providers.go       # All provider implementations
+    │   └── manager.go         # Multi-provider manager with fallback
+    ├── cache/
+    │   └── cache.go           # Redis + local cache
+    └── metrics/
+        └── metrics.go         # Prometheus metrics
 ```
 
-## Where to Look
+## Supported LLM Providers
 
-| Task | Location | Notes |
-|------|----------|-------|
-| DeepSeek API | `main.go:50-103` | HTTP POST with auth header |
-| Intent schema | `main.go:41-47` | ParsedIntent JSON structure |
-| Fallback regex | `main.go:106-124` | Pattern-based extraction |
-| LLM prompt | `main.go:57-58` | System prompt with JSON format |
+| Provider | Type | Environment Variables | Default Model |
+|----------|------|----------------------|---------------|
+| OpenAI | Cloud API | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | gpt-4o-mini |
+| Anthropic | Cloud API | `ANTHROPIC_API_KEY` | claude-3-haiku |
+| DeepSeek | Cloud API | `DEEPSEEK_API_KEY` | deepseek-chat |
+| Ollama | Local | `OLLAMA_BASE_URL` | llama3 |
+| LM Studio | Local | `LMSTUDIO_BASE_URL` | local-model |
+| vLLM | Local | `VLLM_BASE_URL` | local-model |
+| Custom | Any | `<NAME>_API_KEY`, `<NAME>_BASE_URL` | configurable |
 
-## Conventions (This Module)
+## Configuration
 
-### API Key Management
-```go
-var DeepSeekAPIKey = os.Getenv("DEEPSEEK_API_KEY")
-// NEVER hardcode - must come from environment
+### Environment Variables
+
+```bash
+# Provider Selection (optional - auto-detected if not set)
+LLM_PROVIDER=openai  # Options: openai, anthropic, deepseek, ollama, lmstudio, vllm
+
+# Cloud API Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+DEEPSEEK_API_KEY=sk-...
+
+# Local LLM Configuration
+OLLAMA_BASE_URL=http://localhost:11434/api/chat
+LMSTUDIO_BASE_URL=http://localhost:1234/v1/chat/completions
+VLLM_BASE_URL=http://localhost:8000/v1/chat/completions
+
+# Cache Configuration
+CACHE_ENABLED=true
+REDIS_URL=redis://localhost:6379
 ```
 
-### Request/Response Types
+### Auto-Detection Priority
+
+If `LLM_PROVIDER` is not set, the system auto-detects in this order:
+1. OpenAI (if `OPENAI_API_KEY` is set)
+2. Anthropic (if `ANTHROPIC_API_KEY` is set)
+3. DeepSeek (if `DEEPSEEK_API_KEY` is set)
+4. Ollama (always available as fallback)
+
+## Usage
+
+### Basic Usage
+
 ```go
-type DeepSeekRequest struct {
-    Model       string              `json:"model"`
-    Messages    []DeepSeekMessage   `json:"messages"`
-    Temperature float64             `json:"temperature"`  // 0.1 for deterministic
+extractor := NewIntentExtractor()
+intent, err := extractor.ProcessInput("create vm in pool A with cpu=2")
+```
+
+### With Specific Provider
+
+```go
+manager := llm.NewManager(
+    llm.WithProviders(
+        llm.NewOllamaProvider(),
+    ),
+)
+extractor := &IntentExtractor{llmManager: manager}
+```
+
+### With Custom System Prompt
+
+```go
+manager := llm.NewManager(
+    llm.WithSystemPrompt("Custom prompt here..."),
+)
+```
+
+## Intent Schema
+
+```go
+type ParsedIntent struct {
+    Action     string  `json:"action"`     // e.g., "create_vm"
+    Target     string  `json:"target"`     // e.g., "pool-A"
+    Parameters string  `json:"parameters"` // e.g., "cpu=2,ram=4G"
+    Confidence float64 `json:"confidence"` // 0.0-1.0
+    Source     string  `json:"source"`     // "LLM" or "REGEX_FALLBACK"
 }
 ```
 
-### Fallback Pipeline
-```go
-// 1. Try LLM first
-llmResponse, err := invokeLLM(userInput)
-if err == nil { return intent, nil }
+## Fallback Pipeline
 
-// 2. Fallback to regex
-intent, fallbackErr := fallbackRegexExtractor(userInput)
-if fallbackErr == nil { return intent, nil }
-
-// 3. Exhaustion error
-return nil, errors.New("pipeline exhausted")
 ```
-
-## Anti-Patterns (This Module)
-
-### Forbidden
-```go
-// NEVER: Hardcode API key
-const DeepSeekAPIKey = "sk-..."  // SECURITY RISK
-
-// ALWAYS: Environment variable
-var DeepSeekAPIKey = os.Getenv("DEEPSEEK_API_KEY")
-```
-
-### JSON Parsing
-```go
-// WRONG: Fails on partial response
-json.Unmarshal([]byte(llmResponse), &intent)
-
-// CORRECT: Validate structure, handle errors
-if err := json.Unmarshal(...); err == nil {
-    intent.Source = "LLM"
-    return &intent, nil
-}
-```
-
-### Error Handling
-```go
-// WRONG: Silent failure
-defer resp.Body.Close()
-
-// CORRECT: Check status, read body for error
-if resp.StatusCode != http.StatusOK {
-    bodyBytes, _ := io.ReadAll(resp.Body)
-    return "", errors.New("API Error: " + string(bodyBytes))
-}
-```
-
-## Unique Styles
-
-### Temperature Setting
-```go
-// Low temperature for deterministic JSON
-Temperature: 0.1  // vs 0.7+ for creative tasks
-```
-
-### System Prompt Engineering
-```go
-Content: `You are the SMA-OS Intent Extractor. 
-Extract the user's command into EXACTLY this JSON format, 
-NO markdown formatting: {"action": "...", "target": "...", "parameters": "..."}`
-```
-
-### Fallback Confidence
-```go
-// Different confidence for LLM vs fallback
-intent.Source = "LLM"
-intent.Confidence = 0.85
-
-intent.Source = "REGEX_FALLBACK"
-intent.Confidence = 0.99  // Deterministic
+User Input
+    │
+    ▼
+┌─────────────────┐
+│  Check Cache    │ ──► Hit? ──► Return cached result
+└─────────────────┘
+    │ Miss
+    ▼
+┌─────────────────┐
+│  Try LLM        │ ──► Success? ──► Cache & Return
+│  (in order)     │
+└─────────────────┘
+    │ All fail
+    ▼
+┌─────────────────┐
+│  Regex Fallback │ ──► Match? ──► Return
+└─────────────────┘
+    │ No match
+    ▼
+  Error
 ```
 
 ## Commands
@@ -124,8 +140,20 @@ intent.Confidence = 0.99  // Deterministic
 # Build
 cd memory-bus/ingestion && go build -o bin/ingestion .
 
-# Run (requires DEEPSEEK_API_KEY env var)
-export DEEPSEEK_API_KEY=your-key
+# Run with OpenAI
+export OPENAI_API_KEY=sk-...
+go run main.go
+
+# Run with local Ollama
+ollama serve &
+ollama pull llama3
+export LLM_PROVIDER=ollama
+go run main.go
+
+# Run with LM Studio
+# (Start LM Studio server first)
+export LLM_PROVIDER=lmstudio
+export LMSTUDIO_BASE_URL=http://localhost:1234/v1/chat/completions
 go run main.go
 ```
 
@@ -133,23 +161,51 @@ go run main.go
 
 | Package | Purpose |
 |---------|---------|
-| net/http | DeepSeek API calls |
+| net/http | LLM API calls |
 | encoding/json | Request/response serialization |
 | regexp | Fallback pattern matching |
-| bytes | Request body construction |
-| io | Response body reading |
-| time | HTTP client timeout |
+| context | Request cancellation |
+| os | Environment configuration |
 
-## Environment Variables
+## Anti-Patterns
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| DEEPSEEK_API_KEY | Yes | DeepSeek API authentication |
+### Forbidden
+```go
+// NEVER: Hardcode API keys
+const APIKey = "sk-..."
+
+// NEVER: Block on LLM without timeout
+resp, err := client.Do(req) // No timeout set
+
+// NEVER: Ignore provider errors
+_, _ = provider.Invoke(ctx, prompt)
+```
+
+### Required
+```go
+// ALWAYS: Use environment variables
+apiKey := os.Getenv("OPENAI_API_KEY")
+
+// ALWAYS: Set timeouts
+client := &http.Client{Timeout: 30 * time.Second}
+
+// ALWAYS: Handle errors with fallback
+response, err := manager.Invoke(prompt)
+if err != nil {
+    return fallbackRegexExtractor(prompt)
+}
+```
+
+## Metrics
+
+The module exposes Prometheus metrics at `:8080/metrics`:
+- `llm_api_calls_total` - Total LLM API calls
+- `llm_api_errors_total` - Failed API calls
+- `llm_latency_seconds` - Request latency histogram
 
 ## Notes
 
-- **Timeout**: 15 seconds for API calls
-- **Model**: deepseek-chat (DeepSeek V3)
-- **Endpoint**: https://api.deepseek.com/chat/completions
-- **Regex patterns**: Currently limited to VM creation commands
-- **No caching**: Each request hits API (add Redis for production)
+- **Timeout**: 30s for cloud APIs, 60s for local
+- **Temperature**: 0.1 for deterministic JSON output
+- **Cache**: Multi-level (L1: local memory, L2: Redis)
+- **Fallback**: Regex patterns for common commands
