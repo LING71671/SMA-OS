@@ -1,6 +1,6 @@
-# SMA-OS v2.0
+# SMA-OS v1.1.0
 
-> 一个高性能、数学可证明绝对确定性、且具备强力沙箱物理隔离与认知编排的高端 AI 操作系统基座。
+> 一个基于事件溯源和 eBPF 的 AI 智能体调度系统。
 
 [![CI](https://github.com/LING71671/SMA-OS/actions/workflows/ci.yml/badge.svg)](https://github.com/LING71671/SMA-OS/actions/workflows/ci.yml)
 [![Security Audit](https://github.com/LING71671/SMA-OS/actions/workflows/security.yml/badge.svg)](https://github.com/LING71671/SMA-OS/actions/workflows/security.yml)
@@ -9,12 +9,12 @@
 
 ## 📖 简介
 
-SMA-OS (Stateful Machine/Memory Agent Operating System) v2.0 致力于为下一代百万级 AI 智能体集群提供：
+SMA-OS (Stateful Machine/Memory Agent Operating System) v1.1.0 提供以下核心能力：
 
-1. **绝对确定的内核状态转移**（形式化验证保障）
-2. **极高密度的物理执行层**（基于 Firecracker 与 eBPF 探针）
-3. **视觉震撼的可观测性平面**（实时 DAG 拓扑、探针动画反馈、内存回放系统）
-4. **长短记忆读写分离数据总线**（LLM 与结构化数据高速通信）
+1. **事件溯源状态管理** - 基于 Redis/PostgreSQL 的状态持久化
+2. **eBPF 网络过滤** - 内核态包过滤，低延迟安全防护
+3. **DAG 任务编排** - 拓扑排序的分布式任务执行
+4. **意图提取** - 基于 DeepSeek 的自然语言理解
 
 ## 🏗️ 核心架构
 
@@ -139,12 +139,11 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace rust:latest \
 
 ## 📊 性能指标
 
-| 指标 | 目标 | 状态 |
-|------|------|------|
-| P99 延迟 | < 10ms | ✅ |
-| 并发智能体 | 1000+ | ✅ |
-| 事件吞吐量 | 100K/sec | ✅ |
-| eBPF 过滤延迟 | < 100ns | ✅ |
+| 指标 | 目标 |
+|------|------|
+| P99 延迟 | < 10ms |
+| 并发智能体 | 1000+ |
+| 事件吞吐量 | 100K/sec |
 
 ## 🔒 安全特性
 
