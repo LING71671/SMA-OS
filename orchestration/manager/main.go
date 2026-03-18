@@ -82,6 +82,39 @@ func NewDAGManager(config FailureConfig) *DAGManager {
 	}
 }
 
+// AddTasksFromIntent batch-adds TaskNodes produced by AI decomposition.
+// Validates all dependency references exist within the batch before adding.
+func (dm *DAGManager) AddTasksFromIntent(tasks []TaskNode) error {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+
+	idSet := make(map[string]bool, len(tasks))
+	for id := range dm.Nodes {
+		idSet[id] = true
+	}
+	for _, t := range tasks {
+		idSet[t.ID] = true
+	}
+
+	for _, t := range tasks {
+		for _, dep := range t.Dependencies {
+			if !idSet[dep] {
+				return fmt.Errorf("task %s depends on undefined task %s", t.ID, dep)
+			}
+		}
+	}
+
+	for _, t := range tasks {
+		task := t
+		dm.Nodes[task.ID] = &task
+		dm.inDegree[task.ID] = len(task.Dependencies)
+		for _, dep := range task.Dependencies {
+			dm.dependents[dep] = append(dm.dependents[dep], task.ID)
+		}
+	}
+	return nil
+}
+
 // AddTask computes indegrees dynamically and builds adjacency list
 func (dm *DAGManager) AddTask(t TaskNode) {
 	dm.mu.Lock()

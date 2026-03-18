@@ -1,9 +1,146 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
+	"time"
 )
+
+// DecompositionRequest is the HTTP body for POST /api/v1/tasks/decompose.
+type DecompositionRequest struct {
+	Intent      ParsedIntent `json:"intent"`
+	MaxDepth    int          `json:"max_depth"`
+	MaxSubTasks int          `json:"max_sub_tasks"`
+}
+
+// ParsedIntent mirrors memory-bus/ingestion's ParsedIntent.
+type ParsedIntent struct {
+	Action     string  `json:"action"`
+	Target     string  `json:"target"`
+	Parameters string  `json:"parameters"`
+	Confidence float64 `json:"confidence"`
+	Source     string  `json:"source"`
+}
+
+// DecomposedTask is a single task returned by the inline decomposer.
+type DecomposedTask struct {
+	ID           string   `json:"id"`
+	ActionName   string   `json:"action_name"`
+	Description  string   `json:"description"`
+	Dependencies []string `json:"dependencies"`
+	Priority     int      `json:"priority"`
+}
+
+// DecompositionResponse is the HTTP response for POST /api/v1/tasks/decompose.
+type DecompositionResponse struct {
+	RootTaskID string           `json:"root_task_id"`
+	Tasks      []DecomposedTask `json:"tasks"`
+	Duration   string           `json:"duration"`
+}
+
+// HandleDecomposeTask handles POST /api/v1/tasks/decompose.
+// It performs a rule-based decomposition of the intent and adds the resulting
+// TaskNodes to the DAG manager, returning the decomposition result.
+func (dm *DAGManager) HandleDecomposeTask(w http.ResponseWriter, r *http.Request) {
+	var req DecompositionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Intent.Action == "" {
+		http.Error(w, "intent.action is required", http.StatusBadRequest)
+		return
+	}
+	if req.MaxDepth <= 0 {
+		req.MaxDepth = 5
+	}
+	if req.MaxSubTasks <= 0 {
+		req.MaxSubTasks = 20
+	}
+
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+	_ = ctx
+
+	tasks := decomposeIntent(req)
+	if len(tasks) > req.MaxSubTasks {
+		tasks = tasks[:req.MaxSubTasks]
+	}
+
+	nodes := make([]TaskNode, len(tasks))
+	for i, t := range tasks {
+		nodes[i] = TaskNode{
+			ID:           t.ID,
+			ActionName:   t.ActionName,
+			Dependencies: t.Dependencies,
+			Status:       Pending,
+			Payload:      t.Description,
+			IsAtomic:     true,
+		}
+	}
+
+	if err := dm.AddTasksFromIntent(nodes); err != nil {
+		http.Error(w, "failed to add tasks: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rootID := ""
+	for _, t := range tasks {
+		if len(t.Dependencies) == 0 {
+			rootID = t.ID
+			break
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(DecompositionResponse{
+		RootTaskID: rootID,
+		Tasks:      tasks,
+		Duration:   time.Since(start).String(),
+	})
+}
+
+// decomposeIntent produces a minimal deterministic task DAG from a DecompositionRequest.
+// In production this would delegate to an LLM; here it provides a sensible default.
+func decomposeIntent(req DecompositionRequest) []DecomposedTask {
+	action := strings.ToLower(req.Intent.Action)
+	target := req.Intent.Target
+	params := req.Intent.Parameters
+
+	return []DecomposedTask{
+		{
+			ID:           "T1",
+			ActionName:   "validate_" + action,
+			Description:  "Validate preconditions for " + action + " on " + target,
+			Dependencies: []string{},
+			Priority:     1,
+		},
+		{
+			ID:           "T2",
+			ActionName:   "prepare_" + action,
+			Description:  "Prepare resources for " + action + " with params: " + params,
+			Dependencies: []string{"T1"},
+			Priority:     2,
+		},
+		{
+			ID:           "T3",
+			ActionName:   action,
+			Description:  "Execute " + action + " on " + target,
+			Dependencies: []string{"T2"},
+			Priority:     3,
+		},
+		{
+			ID:           "T4",
+			ActionName:   "verify_" + action,
+			Description:  "Verify result of " + action + " on " + target,
+			Dependencies: []string{"T3"},
+			Priority:     4,
+		},
+	}
+}
 
 // HandleGetProgress handles GET /api/v1/tasks/{taskID}/progress
 func (dm *DAGManager) HandleGetProgress(w http.ResponseWriter, r *http.Request) {
@@ -107,4 +244,5 @@ func (dm *DAGManager) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/dags/analysis", dm.HandleDependencyAnalysis)
 	mux.HandleFunc("GET /api/v1/dags/critical-path", dm.HandleCriticalPath)
 	mux.HandleFunc("GET /api/v1/dags/parallelism", dm.HandleParallelism)
+	mux.HandleFunc("POST /api/v1/tasks/decompose", dm.HandleDecomposeTask)
 }
