@@ -1,11 +1,8 @@
 # SMA-OS Web Dashboard
 
-[**English**](#english) | [**中文**](#中文)
+[中文](./README.md) | [English](./README_ZH.md)
 
 ---
-
-<a name="中文"></a>
-## 中文
 
 SMA-OS 的实时可观测性 UI，用于 DAG 可视化、任务管理和依赖分析。
 
@@ -55,17 +52,17 @@ npm run lint
 
 ### 任务管理 API
 ```
-GET /api/v1/tasks/{id}/progress    # 进度数据 (0-100%)
-POST /api/v1/tasks/{id}/pause      # 暂停运行中的任务
-POST /api/v1/tasks/{id}/resume     # 恢复已暂停的任务
+GET /api/v1/tasks/{id}/progress # 进度数据 (0-100%)
+POST /api/v1/tasks/{id}/pause # 暂停运行中的任务
+POST /api/v1/tasks/{id}/resume # 恢复已暂停的任务
 ```
 
 ### 依赖分析 API
 ```
-GET /api/v1/dags/analysis          # 完整依赖分析
-GET /api/v1/dags/critical-path     # 关键路径数据
-GET /api/v1/dags/parallelism       # 并行度信息
-GET /api/v1/tasks/{id}/impact      # 失败影响范围
+GET /api/v1/dags/analysis # 完整依赖分析
+GET /api/v1/dags/critical-path # 关键路径数据
+GET /api/v1/dags/parallelism # 并行度信息
+GET /api/v1/tasks/{id}/impact # 失败影响范围
 ```
 
 ## 技术栈
@@ -84,18 +81,18 @@ GET /api/v1/tasks/{id}/impact      # 失败影响范围
 ```
 web-dashboard/
 ├── app/
-│   ├── page.tsx           # 主 DAG 查看器
-│   ├── layout.tsx         # 根布局
-│   ├── globals.css        # 全局样式
-│   └── components/        # UI 组件
+│   ├── page.tsx # 主 DAG 查看器
+│   ├── layout.tsx # 根布局
+│   ├── globals.css # 全局样式
+│   └── components/ # UI 组件
 │       ├── ProgressBar.tsx
 │       ├── TaskControls.tsx
 │       ├── TaskTree.tsx
 │       ├── DependencyGraph.tsx
 │       └── CriticalPathHighlight.tsx
-├── public/                # 静态资源
-├── package.json           # 依赖
-└── tsconfig.json          # TypeScript 配置 (strict: true)
+├── public/ # 静态资源
+├── package.json # 依赖
+└── tsconfig.json # TypeScript 配置 (strict: true)
 ```
 
 ## 组件使用
@@ -106,7 +103,7 @@ import { ProgressBar } from '@/app/components/ProgressBar';
 
 <ProgressBar
   taskId="task-1"
-  progress={75.5}  // 0-100
+  progress={75.5} // 0-100
 />
 ```
 
@@ -116,7 +113,7 @@ import { TaskControls } from '@/app/components/TaskControls';
 
 <TaskControls
   taskId="task-1"
-  status="RUNNING"  // 显示暂停按钮
+  status="RUNNING" // 显示暂停按钮
   onPause={() => handlePause()}
   onResume={() => handleResume()}
 />
@@ -151,156 +148,4 @@ import { DependencyGraph } from '@/app/components/DependencyGraph';
 ```bash
 npm run build
 # 通过 Vercel CLI 或 GitHub 集成部署
-```
-
----
----
-
-<a name="english"></a>
-## English
-
-Real-time observability UI for DAG visualization, task management, and dependency analysis.
-
-## Features
-
-- **DAG Visualization**: Interactive graph with ReactFlow
-- **Task Progress**: Real-time progress bars with percentage display
-- **Task Controls**: Pause/resume buttons with status-based visibility
-- **Dependency Graph**: Visual dependency analysis with interactive nodes
-- **Critical Path**: Highlighted longest execution path
-- **Task Hierarchy**: Tree view of parent/child task relationships
-
-## Components
-
-| Component | Purpose | File |
-|-----------|---------|------|
-| ProgressBar | Visual progress indicator (0-100%) | `src/app/components/ProgressBar.tsx` |
-| TaskControls | Pause/resume buttons with status logic | `src/app/components/TaskControls.tsx` |
-| TaskTree | Hierarchical task structure display | `src/app/components/TaskTree.tsx` |
-| DependencyGraph | Interactive dependency graph | `src/app/components/DependencyGraph.tsx` |
-| CriticalPathHighlight | Critical path overlay | `src/app/components/CriticalPathHighlight.tsx` |
-
-## Getting Started
-
-```bash
-# Install dependencies
-npm install
-
-# Development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Type check
-npx tsc --noEmit
-
-# Lint
-npm run lint
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser.
-
-## API Integration
-
-The dashboard connects to these backend endpoints:
-
-### Task Management API
-```
-GET /api/v1/tasks/{id}/progress    # Progress data (0-100%)
-POST /api/v1/tasks/{id}/pause      # Pause running task
-POST /api/v1/tasks/{id}/resume     # Resume paused task
-```
-
-### Dependency Analysis API
-```
-GET /api/v1/dags/analysis          # Full dependency analysis
-GET /api/v1/dags/critical-path     # Critical path data
-GET /api/v1/dags/parallelism       # Parallelism info
-GET /api/v1/tasks/{id}/impact      # Failure impact scope
-```
-
-## Tech Stack
-
-| Technology | Purpose |
-|------------|---------|
-| Next.js 14 | React framework (App Router) |
-| ReactFlow | DAG and dependency graph visualization |
-| Framer Motion | Animations and transitions |
-| Lucide React | Icon library |
-| TypeScript | Type safety (strict mode) |
-| Tailwind CSS | Styling (optional, mostly custom CSS) |
-
-## Project Structure
-
-```
-web-dashboard/
-├── app/
-│   ├── page.tsx           # Main DAG viewer
-│   ├── layout.tsx         # Root layout
-│   ├── globals.css        # Global styles
-│   └── components/        # UI components
-│       ├── ProgressBar.tsx
-│       ├── TaskControls.tsx
-│       ├── TaskTree.tsx
-│       ├── DependencyGraph.tsx
-│       └── CriticalPathHighlight.tsx
-├── public/                # Static assets
-├── package.json           # Dependencies
-└── tsconfig.json          # TypeScript config (strict: true)
-```
-
-## Component Usage
-
-### ProgressBar
-```tsx
-import { ProgressBar } from '@/app/components/ProgressBar';
-
-<ProgressBar
-  taskId="task-1"
-  progress={75.5}  // 0-100
-/>
-```
-
-### TaskControls
-```tsx
-import { TaskControls } from '@/app/components/TaskControls';
-
-<TaskControls
-  taskId="task-1"
-  status="RUNNING"  // Shows pause button
-  onPause={() => handlePause()}
-  onResume={() => handleResume()}
-/>
-```
-
-### DependencyGraph
-```tsx
-import { DependencyGraph } from '@/app/components/DependencyGraph';
-
-<DependencyGraph
-  graph={analysisResult.graph}
-  highlightCritical={true}
-/>
-```
-
-## Styling
-
-- **Global styles**: `app/globals.css` with glass-morphism effects
-- **Framer Motion**: All animations use `<motion.div>` components
-- **Lucide Icons**: `Activity`, `Zap`, `Server`, `ShieldAlert`, etc.
-
-## Learn More
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [ReactFlow Documentation](https://reactflow.dev/docs/)
-- [Framer Motion Documentation](https://www.framer.com/motion/)
-
-## Deploy on Vercel
-
-The easiest way to deploy is using the [Vercel Platform](https://vercel.com):
-
-```bash
-npm run build
-# Deploy via Vercel CLI or GitHub integration
 ```
